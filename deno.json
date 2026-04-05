@@ -14,11 +14,11 @@
     "reembed": "deno run --allow-read --allow-write --allow-env --allow-net src/cli/reembed.ts"
   },
   "imports": {
+    "@std/assert": "jsr:@std/assert@^1.0.14",
     "@std/dotenv": "jsr:@std/dotenv@^0.225.5",
     "@std/encoding": "jsr:@std/encoding@^1.0.10",
     "@std/fs": "jsr:@std/fs@^1.0.19",
     "@std/path": "jsr:@std/path@^1.1.2",
-    "@std/testing": "jsr:@std/testing@^1.0.15",
     "openai": "npm:openai@^5.12.2",
     "sqlite": "https://deno.land/x/sqlite@v3.9.1/mod.ts"
   },
