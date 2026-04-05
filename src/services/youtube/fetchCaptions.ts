@@ -2,7 +2,7 @@ import { basename, join } from '@std/path'
 
 import { getEnv } from '../../config/env.ts'
 import type { TranscriptCue } from '../../domain/transcript.ts'
-import { MissingCaptionsError } from '../../lib/errors.ts'
+import { MissingCaptionsError, ValidationError } from '../../lib/errors.ts'
 import { parseYouTubeVideoId } from './fetchVideoMetadata.ts'
 import { runYtDlp } from './runYtDlp.ts'
 
@@ -130,7 +130,7 @@ async function findSubtitleFile(tempDir: string, videoId: string) {
 export async function fetchCaptions(
   urlOrVideoId: string,
 ): Promise<TranscriptCue[]> {
-  const { ytDlpBinary } = getEnv()
+  const { ytDlpBinary, maxTranscriptCues } = getEnv()
   const tempDir = await Deno.makeTempDir({ prefix: 'vfx-react-captions-' })
   const videoId = parseYouTubeVideoId(urlOrVideoId) || urlOrVideoId
 
@@ -156,10 +156,23 @@ export async function fetchCaptions(
 
     const content = await Deno.readTextFile(subtitlePath)
     if (basename(subtitlePath).endsWith('.json3')) {
-      return parseJson3(content)
+      const cues = parseJson3(content)
+      if (cues.length > maxTranscriptCues) {
+        throw new ValidationError(
+          `Transcript cue count ${cues.length} exceeded maxTranscriptCues=${maxTranscriptCues}`,
+        )
+      }
+      return cues
     }
 
-    return parseVtt(content)
+    const cues = parseVtt(content)
+    if (cues.length > maxTranscriptCues) {
+      throw new ValidationError(
+        `Transcript cue count ${cues.length} exceeded maxTranscriptCues=${maxTranscriptCues}`,
+      )
+    }
+
+    return cues
   } finally {
     await Deno.remove(tempDir, { recursive: true }).catch(() => undefined)
   }

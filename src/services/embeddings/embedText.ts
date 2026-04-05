@@ -2,6 +2,7 @@ import OpenAI from 'openai'
 
 import { getEnv } from '../../config/env.ts'
 import { MissingApiKeyError } from '../../lib/errors.ts'
+import { withTimeout } from '../../lib/async.ts'
 
 export type EmbedTextResult = {
   model: string
@@ -13,6 +14,7 @@ export type EmbedTextOptions = {
   model?: string
   client?: OpenAI
   maxRetries?: number
+  timeoutMs?: number
 }
 
 function sleep(ms: number) {
@@ -41,14 +43,19 @@ export async function embedText(
   const model = options.model ?? env.openAiEmbeddingModel
   const inputs = Array.isArray(input) ? input : [input]
   const maxRetries = options.maxRetries ?? 3
+  const timeoutMs = options.timeoutMs ?? env.openAiTimeoutMs
 
   let attempt = 0
   while (true) {
     try {
-      const response = await client.embeddings.create({
-        model,
-        input: inputs,
-      })
+      const response = await withTimeout(
+        client.embeddings.create({
+          model,
+          input: inputs,
+        }),
+        timeoutMs,
+        `OpenAI embeddings request timed out after ${timeoutMs}ms`,
+      )
 
       const embeddings = response.data.map((item) => item.embedding)
       return {

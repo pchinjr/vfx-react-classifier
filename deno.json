@@ -6,7 +6,7 @@
     "fmt": "deno fmt",
     "lint": "deno lint",
     "check": "deno check src/**/*.ts scripts/**/*.ts",
-    "test": "deno test --allow-read --allow-write --allow-env",
+    "test": "deno test --allow-read --allow-write --allow-env --allow-run",
     "db:init": "deno run --allow-read --allow-write --allow-env scripts/init_db.ts",
     "ingest": "deno run --allow-read --allow-write --allow-env --allow-run --allow-net src/cli/ingest.ts",
     "ingest:batch": "deno run --allow-read --allow-write --allow-env --allow-run --allow-net src/cli/ingest.ts --batch",

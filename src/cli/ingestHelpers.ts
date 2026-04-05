@@ -1,5 +1,6 @@
 import type { Episode } from '../domain/episode.ts'
 import { EmptyTranscriptError } from '../lib/errors.ts'
+import { withTimeout } from '../lib/async.ts'
 import { logger } from '../lib/logger.ts'
 import { getEnv } from '../config/env.ts'
 import { batchEmbedSegments } from '../services/embeddings/batchEmbedSegments.ts'
@@ -28,41 +29,52 @@ export async function ingestEpisodeUrl(
   db: DatabaseClient,
   url: string,
 ): Promise<IngestEpisodeSummary> {
-  logger.info('ingest.start', { url })
-  const episode = await fetchVideoMetadata(url)
-  upsertEpisode(db, episode)
+  const env = getEnv()
 
-  const rawCues = await fetchCaptions(url)
-  const cues = normalizeTranscript(rawCues)
-  if (!cues.length) {
-    throw new EmptyTranscriptError()
-  }
+  return await withTimeout(
+    (async () => {
+      logger.info('ingest.start', { url })
+      const episode = await fetchVideoMetadata(url)
+      upsertEpisode(db, episode)
 
-  replaceTranscriptCuesForEpisode(db, episode.id, cues)
-  const segments = segmentTranscript(cues, { episodeId: episode.id })
-  replaceSegmentsForEpisode(db, episode.id, segments)
+      const rawCues = await fetchCaptions(url)
+      const cues = normalizeTranscript(rawCues)
+      if (!cues.length) {
+        throw new EmptyTranscriptError()
+      }
 
-  const missingEmbeddings = getSegmentsMissingEmbeddings(
-    db,
-    getEnv().openAiEmbeddingModel,
-    episode.id,
+      const segments = segmentTranscript(cues, {
+        episodeId: episode.id,
+        maxSegments: env.maxSegmentsPerEpisode,
+      })
+      replaceTranscriptCuesForEpisode(db, episode.id, cues)
+      replaceSegmentsForEpisode(db, episode.id, segments)
+
+      const missingEmbeddings = getSegmentsMissingEmbeddings(
+        db,
+        env.openAiEmbeddingModel,
+        episode.id,
+      )
+      await batchEmbedSegments(missingEmbeddings, { db })
+
+      logger.info('ingest.complete', {
+        url,
+        episodeId: episode.id,
+        cueCount: cues.length,
+        segmentCount: segments.length,
+        embeddedCount: missingEmbeddings.length,
+      })
+
+      return {
+        episode,
+        cueCount: cues.length,
+        segmentCount: segments.length,
+        embeddedCount: missingEmbeddings.length,
+      }
+    })(),
+    env.ingestTimeoutMs,
+    `Ingest timed out after ${env.ingestTimeoutMs}ms`,
   )
-  await batchEmbedSegments(missingEmbeddings, { db })
-
-  logger.info('ingest.complete', {
-    url,
-    episodeId: episode.id,
-    cueCount: cues.length,
-    segmentCount: segments.length,
-    embeddedCount: missingEmbeddings.length,
-  })
-
-  return {
-    episode,
-    cueCount: cues.length,
-    segmentCount: segments.length,
-    embeddedCount: missingEmbeddings.length,
-  }
 }
 
 export function printIngestSummary(summary: IngestEpisodeSummary) {

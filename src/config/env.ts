@@ -5,6 +5,11 @@ export type AppEnv = {
   openAiEmbeddingModel: string
   databaseUrl: string
   ytDlpBinary: string
+  ytDlpTimeoutMs: number
+  openAiTimeoutMs: number
+  ingestTimeoutMs: number
+  maxTranscriptCues: number
+  maxSegmentsPerEpisode: number
 }
 
 let cachedEnv: AppEnv | null = null
@@ -22,12 +27,26 @@ export function getEnv(): AppEnv {
   const databaseUrl = Deno.env.get('DATABASE_URL')?.trim() ||
     './data/vfx-react-engine.sqlite'
   const ytDlpBinary = Deno.env.get('YTDLP_BINARY')?.trim() || 'yt-dlp'
+  const ytDlpTimeoutMs = Number(Deno.env.get('YTDLP_TIMEOUT_MS') ?? '30000')
+  const openAiTimeoutMs = Number(Deno.env.get('OPENAI_TIMEOUT_MS') ?? '30000')
+  const ingestTimeoutMs = Number(Deno.env.get('INGEST_TIMEOUT_MS') ?? '120000')
+  const maxTranscriptCues = Number(
+    Deno.env.get('MAX_TRANSCRIPT_CUES') ?? '20000',
+  )
+  const maxSegmentsPerEpisode = Number(
+    Deno.env.get('MAX_SEGMENTS_PER_EPISODE') ?? '10000',
+  )
 
   cachedEnv = {
     openAiApiKey,
     openAiEmbeddingModel,
     databaseUrl,
     ytDlpBinary,
+    ytDlpTimeoutMs,
+    openAiTimeoutMs,
+    ingestTimeoutMs,
+    maxTranscriptCues,
+    maxSegmentsPerEpisode,
   }
 
   return cachedEnv

@@ -26,3 +26,15 @@ export class MissingApiKeyError extends AppError {
     super(message, 'MISSING_API_KEY')
   }
 }
+
+export class TimeoutError extends AppError {
+  constructor(message: string, cause?: unknown) {
+    super(message, 'TIMEOUT', cause)
+  }
+}
+
+export class ValidationError extends AppError {
+  constructor(message: string, cause?: unknown) {
+    super(message, 'VALIDATION_ERROR', cause)
+  }
+}

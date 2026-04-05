@@ -1,5 +1,6 @@
 import type { Segment } from '../../domain/segment.ts'
 import type { TranscriptCue } from '../../domain/transcript.ts'
+import { ValidationError } from '../../lib/errors.ts'
 import { makeId } from '../../lib/ids.ts'
 import { nowIso } from '../../lib/time.ts'
 
@@ -8,6 +9,7 @@ export type SegmentTranscriptOptions = {
   windowSizeSeconds?: number
   strideSeconds?: number
   createdAt?: string
+  maxSegments?: number
 }
 
 function estimateTokens(text: string) {
@@ -30,6 +32,19 @@ export function segmentTranscript(
   const windowSizeSeconds = options.windowSizeSeconds ?? 30
   const strideSeconds = options.strideSeconds ?? 15
   const createdAt = options.createdAt ?? nowIso()
+  const maxSegments = options.maxSegments ?? 10000
+
+  if (!Number.isFinite(windowSizeSeconds) || windowSizeSeconds <= 0) {
+    throw new ValidationError('windowSizeSeconds must be a positive number')
+  }
+
+  if (!Number.isFinite(strideSeconds) || strideSeconds <= 0) {
+    throw new ValidationError('strideSeconds must be a positive number')
+  }
+
+  if (!Number.isFinite(maxSegments) || maxSegments <= 0) {
+    throw new ValidationError('maxSegments must be a positive number')
+  }
 
   if (!cues.length) {
     return []
@@ -44,6 +59,12 @@ export function segmentTranscript(
 
     if (!text) {
       continue
+    }
+
+    if (segments.length >= maxSegments) {
+      throw new ValidationError(
+        `Segment generation exceeded configured maxSegments=${maxSegments}`,
+      )
     }
 
     segments.push({
