@@ -14,7 +14,7 @@ export function getEnv(): AppEnv {
     return cachedEnv
   }
 
-  loadSync({ export: true, envPath: '.env', examplePath: null })
+  loadSync({ export: true, envPath: '.env' })
 
   const openAiApiKey = Deno.env.get('OPENAI_API_KEY')?.trim() ?? ''
   const openAiEmbeddingModel = Deno.env.get('OPENAI_EMBEDDING_MODEL')?.trim() ||

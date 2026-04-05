@@ -108,3 +108,42 @@ export function getSegmentsMissingEmbeddings(
     params,
   )
 }
+
+export function getSegmentsForEpisode(
+  db: DatabaseClient,
+  episodeId: string,
+) {
+  return db.queryEntries<Segment>(
+    `
+    SELECT
+      id,
+      episode_id AS episodeId,
+      start,
+      end,
+      text,
+      token_estimate AS tokenEstimate,
+      created_at AS createdAt
+    FROM segments
+    WHERE episode_id = ?
+    ORDER BY start ASC
+    `,
+    [episodeId],
+  )
+}
+
+export function getAllSegments(db: DatabaseClient) {
+  return db.queryEntries<Segment>(
+    `
+    SELECT
+      id,
+      episode_id AS episodeId,
+      start,
+      end,
+      text,
+      token_estimate AS tokenEstimate,
+      created_at AS createdAt
+    FROM segments
+    ORDER BY episode_id ASC, start ASC
+    `,
+  )
+}
