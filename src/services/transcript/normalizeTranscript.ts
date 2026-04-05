@@ -1,5 +1,7 @@
 import type { TranscriptCue } from '../../domain/transcript.ts'
 
+// Normalization is intentionally conservative: remove obvious noise, compress
+// whitespace, and merge exact repeated adjacent cue text.
 function normalizeCueText(text: string) {
   return text
     .replace(/\[[^\]]+\]/g, ' ')

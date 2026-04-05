@@ -7,6 +7,8 @@ import {
 } from '../services/storage/segmentsRepo.ts'
 import { handleCliError, parseBooleanFlag } from './shared.ts'
 
+// Re-embedding is separated from ingest so partial ingests can be resumed after
+// temporary quota or network failures.
 const force = parseBooleanFlag(Deno.args, '--force')
 const db = openDatabase()
 

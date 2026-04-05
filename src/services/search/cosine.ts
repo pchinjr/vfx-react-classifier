@@ -1,3 +1,5 @@
+// Search is retrieval-first, so cosine similarity is the only ranking signal
+// used once embeddings have been generated.
 export function cosineSimilarity(left: number[], right: number[]) {
   if (left.length !== right.length) {
     throw new Error('Embedding vectors must have the same dimensions')

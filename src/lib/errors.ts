@@ -1,3 +1,5 @@
+// AppError gives CLI code a stable shape for user-facing failures while still
+// preserving the original cause when needed for debugging.
 export class AppError extends Error {
   constructor(
     message: string,

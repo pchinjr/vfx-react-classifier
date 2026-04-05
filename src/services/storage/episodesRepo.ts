@@ -2,6 +2,7 @@ import type { Episode } from '../../domain/episode.ts'
 import type { TranscriptCue } from '../../domain/transcript.ts'
 import type { DatabaseClient } from './db.ts'
 
+// Upsert lets repeated ingests refresh metadata without duplicating the episode.
 export function upsertEpisode(db: DatabaseClient, episode: Episode) {
   db.query(
     `
@@ -35,6 +36,7 @@ export function upsertEpisode(db: DatabaseClient, episode: Episode) {
   return episode
 }
 
+// Captions are treated as replaceable derived data, not append-only history.
 export function replaceTranscriptCuesForEpisode(
   db: DatabaseClient,
   episodeId: string,

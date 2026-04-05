@@ -25,6 +25,8 @@ export type IngestEpisodeSummary = {
   embeddedCount: number
 }
 
+// ingestEpisodeUrl coordinates the full v1 pipeline for one video. It is wrapped
+// in a global timeout because it combines subprocess, network, DB, and API work.
 export async function ingestEpisodeUrl(
   db: DatabaseClient,
   url: string,
@@ -34,6 +36,8 @@ export async function ingestEpisodeUrl(
   return await withTimeout(
     (async () => {
       logger.info('ingest.start', { url })
+      // Order matters here: metadata first, then transcript-derived state, then
+      // embeddings. A later failure can be resumed with reembed.
       const episode = await fetchVideoMetadata(url)
       upsertEpisode(db, episode)
 
@@ -85,6 +89,8 @@ export function printIngestSummary(summary: IngestEpisodeSummary) {
   console.log(`Embeddings: ${summary.embeddedCount}`)
 }
 
+// Batch ingest is deliberately sequential to reduce API pressure and make rate
+// limit behavior easier to reason about.
 export async function ingestMany(
   db: DatabaseClient,
   urls: string[],

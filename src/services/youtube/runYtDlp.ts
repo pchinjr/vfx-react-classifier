@@ -10,6 +10,8 @@ export type RunYtDlpOptions = {
   timeoutMs?: number
 }
 
+// All yt-dlp work goes through one wrapper so timeout, stderr handling, and
+// process failure mapping stay consistent.
 export async function runYtDlp(
   binary: string,
   args: string[],

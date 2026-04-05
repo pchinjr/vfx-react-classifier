@@ -2,6 +2,8 @@ import type { SegmentEmbedding } from '../../domain/embedding.ts'
 import type { Segment } from '../../domain/segment.ts'
 import type { DatabaseClient } from './db.ts'
 
+// Segments are replaced wholesale per episode because they are deterministically
+// derived from the normalized transcript and current segmentation settings.
 export function replaceSegmentsForEpisode(
   db: DatabaseClient,
   episodeId: string,
@@ -39,6 +41,8 @@ export function replaceSegmentsForEpisode(
   }
 }
 
+// Embeddings are keyed by segment + model so the same corpus can be re-embedded
+// later without destroying historical compatibility.
 export function upsertSegmentEmbeddings(
   db: DatabaseClient,
   embeddings: SegmentEmbedding[],

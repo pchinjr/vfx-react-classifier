@@ -1,3 +1,5 @@
+// Schema is kept in one file so database initialization is deterministic and
+// easy to diff as the project evolves.
 export const SQL_SCHEMA = `
 CREATE TABLE IF NOT EXISTS episodes (
   id TEXT PRIMARY KEY,

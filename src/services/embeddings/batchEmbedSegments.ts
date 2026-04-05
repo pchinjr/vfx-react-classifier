@@ -11,6 +11,8 @@ export type BatchEmbedSegmentsOptions = EmbedTextOptions & {
   db?: DatabaseClient
 }
 
+// Segments are embedded in batches both for API efficiency and to make progress
+// visible in logs. Persistence happens batch-by-batch so partial success is kept.
 export async function batchEmbedSegments(
   segments: Segment[],
   options: BatchEmbedSegmentsOptions = {},

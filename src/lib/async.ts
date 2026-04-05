@@ -1,5 +1,7 @@
 import { TimeoutError } from './errors.ts'
 
+// Wrap a promise with a wall-clock timeout. This is used around external work
+// so a stalled subprocess or network request cannot hang the CLI indefinitely.
 export async function withTimeout<T>(
   operation: Promise<T>,
   timeoutMs: number,

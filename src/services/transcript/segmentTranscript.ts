@@ -12,6 +12,8 @@ export type SegmentTranscriptOptions = {
   maxSegments?: number
 }
 
+// Token count is only a rough sizing hint for now; the value is not used for
+// billing or hard limits.
 function estimateTokens(text: string) {
   return Math.ceil(text.split(/\s+/).filter(Boolean).length * 1.3)
 }
@@ -53,6 +55,8 @@ export function segmentTranscript(
   const transcriptEnd = Math.max(...cues.map((cue) => cue.end))
   const segments: Segment[] = []
 
+  // The positive stride validation above is what makes this loop practically
+  // safe from turning into a non-advancing infinite loop.
   for (let start = 0; start < transcriptEnd; start += strideSeconds) {
     const end = Math.min(start + windowSizeSeconds, transcriptEnd)
     const text = collectWindowText(cues, start, end)
@@ -61,6 +65,8 @@ export function segmentTranscript(
       continue
     }
 
+    // Hard-cap segment creation so a malformed transcript or bad options cannot
+    // grow the output without bound.
     if (segments.length >= maxSegments) {
       throw new ValidationError(
         `Segment generation exceeded configured maxSegments=${maxSegments}`,

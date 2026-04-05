@@ -11,6 +11,8 @@ export type SearchSegmentsOptions = EmbedTextOptions & {
   embedder?: typeof embedText
 }
 
+// Query embedding is computed once, then compared against every stored segment
+// embedding for the active model. This is intentionally simple for v1.
 export async function searchSegments(
   queryText: string,
   options: SearchSegmentsOptions,

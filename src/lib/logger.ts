@@ -9,6 +9,8 @@ export type Logger = {
   error: (message: string, context?: LogContext) => void
 }
 
+// The current logger is intentionally simple JSON-line output so logs are easy
+// to read locally and also easy to ship elsewhere later.
 function log(level: LogLevel, message: string, context: LogContext = {}) {
   const event = {
     ts: new Date().toISOString(),

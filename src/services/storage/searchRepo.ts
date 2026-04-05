@@ -14,6 +14,8 @@ export type SegmentWithEmbedding = {
   dimensions: number
 }
 
+// Embeddings are currently stored as JSON strings in SQLite, so search loading
+// deserializes them into numeric arrays before ranking.
 export function getSegmentsWithEmbeddings(
   db: DatabaseClient,
   model: string,

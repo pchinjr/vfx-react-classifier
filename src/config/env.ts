@@ -1,5 +1,7 @@
 import { loadSync } from '@std/dotenv'
 
+// AppEnv centralizes every runtime knob so CLI commands and services resolve
+// configuration from one place instead of reaching into process env directly.
 export type AppEnv = {
   openAiApiKey: string
   openAiEmbeddingModel: string
@@ -21,6 +23,8 @@ export function getEnv(): AppEnv {
 
   loadSync({ export: true, envPath: '.env' })
 
+  // These values are intentionally parsed once and cached to keep configuration
+  // deterministic for the life of the process.
   const openAiApiKey = Deno.env.get('OPENAI_API_KEY')?.trim() ?? ''
   const openAiEmbeddingModel = Deno.env.get('OPENAI_EMBEDDING_MODEL')?.trim() ||
     'text-embedding-3-small'

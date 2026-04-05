@@ -7,6 +7,7 @@ import {
   printIngestSummary,
 } from './ingestHelpers.ts'
 
+// CLI entrypoint for one-off and batch ingest operations.
 const args = [...Deno.args]
 const batchMode = parseBooleanFlag(args, '--batch')
 const db = openDatabase()

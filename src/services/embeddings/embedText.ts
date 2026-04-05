@@ -29,6 +29,8 @@ function shouldRetry(error: unknown) {
   return /429|timeout|temporar|rate limit|ECONNRESET|503/i.test(error.message)
 }
 
+// embedText is the single boundary to OpenAI embeddings. Batching happens in a
+// higher-level service, but retries and request timeout handling live here.
 export async function embedText(
   input: string | string[],
   options: EmbedTextOptions = {},

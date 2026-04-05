@@ -25,6 +25,8 @@ function parseVttTimestamp(value: string) {
   throw new Error(`Unsupported VTT timestamp: ${value}`)
 }
 
+// The captions parser strips simple markup because retrieval quality is better
+// when the transcript text resembles spoken language instead of subtitle tags.
 function stripVttMarkup(value: string) {
   return value
     .replace(/<[^>]+>/g, ' ')
@@ -127,6 +129,8 @@ async function findSubtitleFile(tempDir: string, videoId: string) {
   return candidates.sort((left, right) => left.localeCompare(right))[0]
 }
 
+// Caption fetch prefers YouTube subtitles because they are cheap and aligned.
+// A hard cue cap prevents extreme files from being accepted silently.
 export async function fetchCaptions(
   urlOrVideoId: string,
 ): Promise<TranscriptCue[]> {

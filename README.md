@@ -3,6 +3,34 @@
 Transcript-first semantic retrieval for Corridor Crew "VFX Artists React"
 episodes.
 
+This repository is the retrieval foundation for a future classifier system. The
+current version does not try to decide which movie a segment belongs to. It
+focuses on collecting transcript-aligned windows, embedding them, and returning
+the most semantically similar windows for a text query.
+
+## What This Does
+
+For each ingested YouTube episode, the pipeline:
+
+1. fetches video metadata with `yt-dlp`
+2. fetches English captions or auto-captions with `yt-dlp`
+3. normalizes the caption stream into cleaner cues
+4. segments the cues into overlapping time windows
+5. embeds each segment with OpenAI embeddings
+6. stores metadata, cues, segments, and embeddings in SQLite
+7. answers semantic queries by embedding the query text and ranking segment
+   embeddings by cosine similarity
+
+## What This Does Not Do Yet
+
+- no OCR
+- no frame or multimodal embeddings
+- no movie database integration
+- no title extraction into a canonical movie catalog
+- no UI
+- no segment merge / collapse pass on overlapping search hits
+- no classifier training or active learning
+
 ## Scope
 
 This v1 builds the retrieval foundation:
@@ -23,16 +51,55 @@ and classifier training.
 - Deno 2.x
 - `yt-dlp` available on `PATH`
 - OpenAI API key for embeddings
+- network access for `yt-dlp` and the OpenAI API
 
-## Setup
+## Quick Start
 
-1. Copy `.env.example` to `.env`.
-2. Fill in `OPENAI_API_KEY`.
-3. Initialize the database:
+1. Copy the environment template:
+
+```bash
+cp .env.example .env
+```
+
+2. Edit `.env` and set `OPENAI_API_KEY`.
+
+3. Initialize the SQLite database:
 
 ```bash
 deno task db:init
 ```
+
+4. Ingest one episode:
+
+```bash
+deno task ingest "https://www.youtube.com/watch?v=D7Cv7x6jjYQ"
+```
+
+5. Query the corpus:
+
+```bash
+deno task query "punisher"
+```
+
+## Setup
+
+The application reads configuration from `.env`. The most important values are:
+
+- `OPENAI_API_KEY`: required for embeddings and search queries
+- `OPENAI_EMBEDDING_MODEL`: defaults to `text-embedding-3-small`
+- `DATABASE_URL`: SQLite file path
+- `YTDLP_BINARY`: path to `yt-dlp`
+
+Safety and boundedness settings:
+
+- `YTDLP_TIMEOUT_MS`: max runtime for a `yt-dlp` subprocess
+- `OPENAI_TIMEOUT_MS`: max runtime for one embeddings request
+- `INGEST_TIMEOUT_MS`: cap for one full ingest call
+- `MAX_TRANSCRIPT_CUES`: hard cap on accepted caption cues
+- `MAX_SEGMENTS_PER_EPISODE`: hard cap on generated transcript windows
+
+These limits exist to keep the process practically bounded under bad network
+conditions or malformed inputs.
 
 ## Commands
 
@@ -41,9 +108,65 @@ deno task ingest "https://www.youtube.com/watch?v=VIDEO_ID"
 deno task ingest:batch ./urls.txt
 deno task query "Jurassic Park T-Rex"
 deno task reembed
+deno task db:init
+deno task check
 deno task test
 deno task lint
+deno task fmt
 ```
+
+### Command Notes
+
+`deno task ingest <url>`
+
+- fetches metadata and captions
+- normalizes and segments the transcript
+- writes episode, cues, and segments
+- embeds any missing segments for the configured model
+
+`deno task ingest:batch <file>`
+
+- reads newline-separated URLs from a file
+- ingests them sequentially
+
+`deno task query <text>`
+
+- embeds the query text
+- scores every stored segment embedding with cosine similarity
+- prints the top results with timestamps and scores
+
+`deno task reembed`
+
+- finds segments that do not yet have embeddings for the active model
+- embeds only those missing segments
+
+`deno task reembed --force`
+
+- re-embeds every stored segment for the active model
+- useful after changing models or re-running a full embedding pass
+
+## Data Model
+
+### Episode
+
+Represents one YouTube video and its metadata.
+
+### TranscriptCue
+
+Represents one caption cue with a start time, end time, and text.
+
+### Segment
+
+Represents one overlapping transcript window, usually `30s` wide with a `15s`
+stride.
+
+### SegmentEmbedding
+
+Represents one embedding vector for one segment for one embedding model.
+
+### SearchResult
+
+Represents one ranked retrieval hit enriched with episode title and timestamps.
 
 ## Storage
 
@@ -58,6 +181,37 @@ Tables:
 
 Embeddings are stored as JSON for v1 simplicity. The repository layer keeps the
 storage boundary explicit so a vector database or Postgres can be added later.
+
+## Ingest Flow
+
+When you run `deno task ingest <url>`, the application does the following:
+
+1. parse the YouTube video ID from the URL
+2. ask `yt-dlp` for video metadata
+3. ask `yt-dlp` for English subtitles or auto-subtitles
+4. parse VTT or JSON3 subtitles into `TranscriptCue[]`
+5. normalize caption text and merge obvious repetition
+6. generate overlapping transcript segments
+7. upsert the episode row
+8. replace caption rows for the episode
+9. replace segment rows for the episode
+10. embed any segments missing embeddings for the active model
+
+If the embedding step fails, earlier persisted data remains in the database and
+you can resume later with `deno task reembed`.
+
+## Search Flow
+
+When you run `deno task query <text>`, the application:
+
+1. embeds the query text with the active embedding model
+2. loads all stored segment embeddings for that model
+3. computes cosine similarity in process
+4. sorts the results descending
+5. prints the top `5` results by default
+
+Because transcript segmentation overlaps, nearby windows often appear together
+in the output. That behavior is expected in the current version.
 
 ## Architecture
 
@@ -76,6 +230,117 @@ src/
   tests/
 scripts/
 ```
+
+### Directory Guide
+
+`src/config`
+
+- environment loading and configuration parsing
+
+`src/domain`
+
+- core application types shared across modules
+
+`src/services/youtube`
+
+- `yt-dlp` integration and subtitle parsing
+
+`src/services/transcript`
+
+- pure transcript cleanup and segmentation logic
+
+`src/services/embeddings`
+
+- OpenAI embeddings integration and batching
+
+`src/services/storage`
+
+- SQLite access, schema, and repository functions
+
+`src/services/search`
+
+- cosine similarity and retrieval ranking
+
+`src/cli`
+
+- command-line entrypoints and output formatting
+
+`src/lib`
+
+- small shared utilities and app-level error helpers
+
+`src/tests`
+
+- unit and integration-style tests
+
+## Operational Limits
+
+This code is designed to be practically bounded:
+
+- segmentation rejects non-positive stride or window size
+- segment generation has a hard max segment count
+- transcript ingestion has a hard max cue count
+- `yt-dlp` subprocesses time out
+- OpenAI embedding requests time out
+- the whole ingest flow has a wall-clock timeout
+
+These protections are covered by tests and are intended to prevent common
+runaway scenarios, but they are still operational safeguards rather than a
+formal proof of termination.
+
+## Failure Modes
+
+Expected failures include:
+
+- missing captions for a video
+- malformed caption files
+- YouTube rate limiting during subtitle fetch
+- missing OpenAI API key
+- OpenAI quota exhaustion
+- transcript normalization producing no remaining text
+
+Current behavior:
+
+- metadata, cues, and segments may be persisted before embedding fails
+- rerunning `ingest` or `reembed` should resume the missing embedding work
+
+## Testing
+
+Run the full verification suite with:
+
+```bash
+deno task check
+deno task lint
+deno task test
+```
+
+The test suite currently covers:
+
+- transcript normalization
+- transcript segmentation
+- deterministic segment IDs
+- cosine similarity
+- repository upsert behavior
+- integration-style search over fixture transcript data
+- boundedness protections for invalid segmentation config
+- timeout protections for stalled subprocess and embedding calls
+
+## Current Limitations
+
+- Search quality depends heavily on subtitle quality.
+- Some YouTube subtitles are noisy or repetitive.
+- Search returns overlapping windows independently.
+- No movie extraction or catalog table exists yet.
+- Query scoring is currently in-process over all embeddings, which is fine for
+  small corpora but not intended as the final scaling strategy.
+
+## Suggested Next Steps
+
+- add transcript dedup/compression for noisy auto-captions
+- add catalog/status commands for partial ingests
+- add movie-title extraction into a separate entity table
+- add result collapsing for overlapping windows
+- move search candidates to a more scalable vector-aware backend when needed
 
 ## Notes
 

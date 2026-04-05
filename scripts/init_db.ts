@@ -5,6 +5,7 @@ import {
   resolveDatabasePath,
 } from '../src/services/storage/db.ts'
 
+// Small script entrypoint used by the Deno task to create the SQLite schema.
 const dbPath = resolveDatabasePath()
 const db = openDatabase(dbPath)
 

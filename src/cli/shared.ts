@@ -6,6 +6,8 @@ export function parseBooleanFlag(args: string[], flag: string) {
   return args.includes(flag)
 }
 
+// Query output is intentionally plain text so it works well in terminals and
+// stays easy to redirect into files later if needed.
 export function printSearchResults(results: SearchResult[]) {
   if (!results.length) {
     console.log('No matches found.')
@@ -23,6 +25,8 @@ export function printSearchResults(results: SearchResult[]) {
   }
 }
 
+// Centralized CLI error handling keeps command entrypoints thin and ensures the
+// user sees stable error codes for expected failure modes.
 export function handleCliError(error: unknown) {
   if (error instanceof AppError) {
     console.error(`[${error.code}] ${error.message}`)

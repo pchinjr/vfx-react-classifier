@@ -1,3 +1,4 @@
+// Keep timestamp formatting centralized so CLI output stays consistent.
 export function nowIso() {
   return new Date().toISOString()
 }

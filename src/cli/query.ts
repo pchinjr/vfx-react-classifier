@@ -2,6 +2,7 @@ import { handleCliError, printSearchResults } from './shared.ts'
 import { initializeDatabase, openDatabase } from '../services/storage/db.ts'
 import { searchSegments } from '../services/search/searchSegments.ts'
 
+// CLI entrypoint for semantic retrieval queries.
 const queryText = Deno.args.join(' ').trim()
 const db = openDatabase()
 

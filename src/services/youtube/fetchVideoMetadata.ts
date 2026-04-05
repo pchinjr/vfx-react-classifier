@@ -15,6 +15,8 @@ type YtDlpMetadata = {
   webpage_url?: string
 }
 
+// URL parsing is intentionally narrow to the common YouTube forms used by the
+// CLI. Failed parsing is treated as invalid user input upstream.
 export function parseYouTubeVideoId(url: string) {
   try {
     const parsed = new URL(url)
@@ -52,6 +54,8 @@ function normalizeUploadDate(input?: string) {
   return `${input.slice(0, 4)}-${input.slice(4, 6)}-${input.slice(6, 8)}`
 }
 
+// Metadata fetch is a separate step from caption fetch so partial ingests can
+// still keep a useful catalog row even if subtitles are unavailable.
 export async function fetchVideoMetadata(url: string): Promise<Episode> {
   const youtubeVideoId = parseYouTubeVideoId(url)
   if (!youtubeVideoId) {
