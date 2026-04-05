@@ -1,6 +1,7 @@
-import { handleCliError, parseBooleanFlag } from './shared.ts'
+import { handleCliError, parseBooleanFlag, parseStringFlag } from './shared.ts'
 import { initializeDatabase, openDatabase } from '../services/storage/db.ts'
 import {
+  ingestEpisodeFromTranscriptFile,
   ingestEpisodeUrl,
   ingestMany,
   parseBatchFile,
@@ -10,6 +11,7 @@ import {
 // CLI entrypoint for one-off and batch ingest operations.
 const args = [...Deno.args]
 const batchMode = parseBooleanFlag(args, '--batch')
+const transcriptPath = parseStringFlag(args, '--transcript')
 const db = openDatabase()
 
 try {
@@ -25,12 +27,19 @@ try {
     const summaries = await ingestMany(db, urls)
     summaries.forEach(printIngestSummary)
   } else {
-    const url = args[0]
+    const positionalArgs = args.filter((arg, index) =>
+      !arg.startsWith('--') && args[index - 1] !== '--transcript'
+    )
+    const url = positionalArgs[0]
     if (!url) {
-      throw new Error('Usage: deno task ingest <youtube-url>')
+      throw new Error(
+        'Usage: deno task ingest <youtube-url> [--transcript <file>]',
+      )
     }
 
-    const summary = await ingestEpisodeUrl(db, url)
+    const summary = transcriptPath
+      ? await ingestEpisodeFromTranscriptFile(db, url, transcriptPath)
+      : await ingestEpisodeUrl(db, url)
     printIngestSummary(summary)
   }
 } catch (error) {

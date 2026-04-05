@@ -124,6 +124,13 @@ deno task fmt
 - writes episode, cues, and segments
 - embeds any missing segments for the configured model
 
+`deno task ingest <url> --transcript <file>`
+
+- bypasses YouTube subtitle download
+- loads cues from a local `.vtt`, `.json3`, or cue-array `.json` file
+- reuses the same normalization, segmentation, persistence, and embedding path
+- useful when YouTube subtitle fetch is rate-limited
+
 `deno task ingest:batch <file>`
 
 - reads newline-separated URLs from a file

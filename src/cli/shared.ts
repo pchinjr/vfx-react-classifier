@@ -6,6 +6,15 @@ export function parseBooleanFlag(args: string[], flag: string) {
   return args.includes(flag)
 }
 
+export function parseStringFlag(args: string[], flag: string) {
+  const index = args.findIndex((arg) => arg === flag)
+  if (index < 0) {
+    return null
+  }
+
+  return args[index + 1] ?? null
+}
+
 // Query output is intentionally plain text so it works well in terminals and
 // stays easy to redirect into files later if needed.
 export function printSearchResults(results: SearchResult[]) {
