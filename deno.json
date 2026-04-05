@@ -1,0 +1,39 @@
+{
+  "lock": true,
+  "nodeModulesDir": "auto",
+  "tasks": {
+    "fmt:check": "deno fmt --check",
+    "fmt": "deno fmt",
+    "lint": "deno lint",
+    "check": "deno check src/**/*.ts scripts/**/*.ts",
+    "test": "deno test --allow-read --allow-write --allow-env",
+    "db:init": "deno run --allow-read --allow-write --allow-env scripts/init_db.ts",
+    "ingest": "deno run --allow-read --allow-write --allow-env --allow-run --allow-net src/cli/ingest.ts",
+    "ingest:batch": "deno run --allow-read --allow-write --allow-env --allow-run --allow-net src/cli/ingest.ts --batch",
+    "query": "deno run --allow-read --allow-write --allow-env --allow-net src/cli/query.ts",
+    "reembed": "deno run --allow-read --allow-write --allow-env --allow-net src/cli/reembed.ts"
+  },
+  "imports": {
+    "@std/dotenv": "jsr:@std/dotenv@^0.225.5",
+    "@std/encoding": "jsr:@std/encoding@^1.0.10",
+    "@std/fs": "jsr:@std/fs@^1.0.19",
+    "@std/path": "jsr:@std/path@^1.1.2",
+    "@std/testing": "jsr:@std/testing@^1.0.15",
+    "openai": "npm:openai@^5.12.2",
+    "sqlite": "https://deno.land/x/sqlite@v3.9.1/mod.ts"
+  },
+  "fmt": {
+    "semiColons": false,
+    "singleQuote": true
+  },
+  "lint": {
+    "rules": {
+      "tags": [
+        "recommended"
+      ]
+    }
+  },
+  "compilerOptions": {
+    "strict": true
+  }
+}
