@@ -115,6 +115,7 @@ deno task resolve:episode --episode ep_123 --force
 deno task spans:candidates --span span_123
 deno task spans:label --span span_123 --candidate-rank 1
 deno task episode:report --episode ep_123
+deno task ml:build-dataset --out artifacts/ml/candidate-training.jsonl
 deno task query "Jurassic Park T-Rex"
 deno task reembed
 deno task db:init
@@ -195,6 +196,14 @@ deno task fmt
 - prints the latest resolver run status and notes
 - lists each span with its candidate count, top candidate, and confirmed label
 
+`deno task ml:build-dataset`
+
+- exports one JSONL row per `(span, candidate)` pair for manually labeled spans
+- assigns positive rows when the candidate matches the confirmed label
+- assigns negative rows for the other candidates attached to the same span
+- includes deterministic `train`, `validation`, or `test` splits by span ID
+- accepts `--out <path>`, defaulting to `artifacts/ml/candidate-training.jsonl`
+
 `deno task query <text>`
 
 - embeds the query text
@@ -246,6 +255,12 @@ resolver output and can be safely replaced with `resolve:episode --force`.
 
 Represents one confirmed movie association for a discussion span. Labels are
 stored separately from candidates so resolver reruns do not erase manual review.
+
+### CandidateTrainingRow
+
+Represents one Phase 3 training example for a span-candidate pair. Rows are
+derived only from manually labeled spans and exported as JSONL for offline model
+training.
 
 ### SegmentEmbedding
 
@@ -392,6 +407,19 @@ When you run `deno task episode:report --episode <episode-id>`, the application:
 This command is read-only and is intended as the checkpoint after span
 resolution and manual labeling.
 
+## ML Dataset Flow
+
+When you run `deno task ml:build-dataset`, the application:
+
+1. loads spans with manual labels
+2. joins each labeled span to its stored candidate movies
+3. marks the confirmed candidate as `label = 1`
+4. marks the other candidates for that span as `label = 0`
+5. writes deterministic JSONL rows to the output path
+
+This is the first Phase 3 primitive. It prepares labeled data for a future
+candidate reranker, but it does not train or run a model yet.
+
 ## Architecture
 
 ```text
@@ -507,6 +535,7 @@ The test suite currently covers:
 - span movie candidate ranking and resolution run persistence
 - manual span label confirmation and rerun preservation
 - episode-level reporting
+- Phase 3 candidate training dataset export
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -520,6 +549,7 @@ The test suite currently covers:
 - Span resolution is heuristic and title-phrase driven; it is expected to need
   human review before labels are accepted.
 - Manual movie labels currently support one primary movie per span.
+- Phase 3 training data only includes spans with manual labels.
 - Query scoring is currently in-process over all embeddings, which is fine for
   small corpora but not intended as the final scaling strategy.
 
@@ -527,6 +557,7 @@ The test suite currently covers:
 
 - add richer candidate resolution heuristics for person names and one-word
   titles
+- add stable candidate feature vectors for Phase 3 reranking
 - move search candidates to a more scalable vector-aware backend when needed
 
 ## Notes
