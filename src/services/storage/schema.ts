@@ -83,4 +83,37 @@ CREATE TABLE IF NOT EXISTS movie_catalog (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_movie_catalog_source_movie_id
   ON movie_catalog (source, source_movie_id);
+
+CREATE TABLE IF NOT EXISTS span_resolution_runs (
+  id TEXT PRIMARY KEY,
+  episode_id TEXT NOT NULL,
+  resolver_version TEXT NOT NULL,
+  started_at TEXT NOT NULL,
+  completed_at TEXT,
+  status TEXT NOT NULL,
+  notes TEXT,
+  FOREIGN KEY (episode_id) REFERENCES episodes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_span_resolution_runs_episode_id
+  ON span_resolution_runs (episode_id);
+
+CREATE TABLE IF NOT EXISTS span_movie_candidates (
+  id TEXT PRIMARY KEY,
+  span_id TEXT NOT NULL,
+  movie_id TEXT NOT NULL,
+  rank INTEGER NOT NULL,
+  confidence REAL NOT NULL,
+  resolver_version TEXT NOT NULL,
+  evidence_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (span_id) REFERENCES discussion_spans(id) ON DELETE CASCADE,
+  FOREIGN KEY (movie_id) REFERENCES movie_catalog(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_span_movie_candidates_span_id
+  ON span_movie_candidates (span_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_span_movie_candidates_span_movie_resolver
+  ON span_movie_candidates (span_id, movie_id, resolver_version);
 `

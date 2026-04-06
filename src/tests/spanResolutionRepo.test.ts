@@ -1,0 +1,145 @@
+import { assertEquals } from '@std/assert'
+
+import type { DiscussionSpan } from '../domain/discussionSpan.ts'
+import type { MovieCatalogRecord } from '../domain/movieCatalog.ts'
+import type { SpanMovieCandidate } from '../domain/spanResolution.ts'
+import { nowIso } from '../lib/time.ts'
+import { upsertDiscussionSpans } from '../services/storage/discussionSpansRepo.ts'
+import { upsertEpisode } from '../services/storage/episodesRepo.ts'
+import { upsertMovieCatalogRecords } from '../services/storage/movieCatalogRepo.ts'
+import {
+  completeSpanResolutionRun,
+  countSpanMovieCandidatesForEpisode,
+  createSpanResolutionRun,
+  deleteSpanMovieCandidatesForEpisode,
+  getSpanMovieCandidates,
+  upsertSpanMovieCandidates,
+} from '../services/storage/spanResolutionRepo.ts'
+import { createTestDatabase } from '../services/storage/testDb.ts'
+
+function discussionSpan(): DiscussionSpan {
+  return {
+    id: 'span_one',
+    episodeId: 'ep_one',
+    start: 0,
+    end: 180,
+    text: 'Jurassic Park discussion',
+    sourceSegmentCount: 3,
+    createdAt: '2026-01-01T00:00:00.000Z',
+  }
+}
+
+function movie(): MovieCatalogRecord {
+  return {
+    id: 'movie_jurassic',
+    source: 'tmdb',
+    sourceMovieId: '329',
+    title: 'Jurassic Park',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  }
+}
+
+function candidate(
+  overrides: Partial<SpanMovieCandidate> = {},
+): SpanMovieCandidate {
+  return {
+    id: 'cand_one',
+    spanId: 'span_one',
+    movieId: 'movie_jurassic',
+    rank: 1,
+    confidence: 0.9,
+    resolverVersion: 'span-movie-resolver-v1',
+    evidenceJson: '{}',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+function seed(db: ReturnType<typeof createTestDatabase>['db']) {
+  upsertEpisode(db, {
+    id: 'ep_one',
+    youtubeVideoId: 'abc123',
+    title: 'Episode',
+    sourceUrl: 'https://youtube.com/watch?v=abc123',
+    createdAt: nowIso(),
+  })
+  upsertDiscussionSpans(db, [discussionSpan()])
+  upsertMovieCatalogRecords(db, [movie()])
+}
+
+Deno.test('span resolution runs can be completed', () => {
+  const { db } = createTestDatabase('span-resolution-run')
+
+  try {
+    seed(db)
+    createSpanResolutionRun(db, {
+      id: 'run_one',
+      episodeId: 'ep_one',
+      resolverVersion: 'span-movie-resolver-v1',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      status: 'running',
+    })
+    completeSpanResolutionRun(
+      db,
+      'run_one',
+      'completed',
+      '2026-01-01T00:01:00.000Z',
+      'ok',
+    )
+
+    assertEquals(
+      db.queryEntries<{ status: string; notes: string }>(
+        'SELECT status, notes FROM span_resolution_runs WHERE id = ?',
+        ['run_one'],
+      )[0],
+      { status: 'completed', notes: 'ok' },
+    )
+  } finally {
+    db.close()
+  }
+})
+
+Deno.test('upsertSpanMovieCandidates is safe across resolver reruns', () => {
+  const { db } = createTestDatabase('span-resolution-candidates')
+
+  try {
+    seed(db)
+    upsertSpanMovieCandidates(db, [candidate()])
+    upsertSpanMovieCandidates(db, [candidate({ confidence: 0.8 })])
+
+    const candidates = getSpanMovieCandidates(db, 'span_one')
+    assertEquals(candidates.length, 1)
+    assertEquals(candidates[0]?.confidence, 0.8)
+    assertEquals(countSpanMovieCandidatesForEpisode(db, 'ep_one'), 1)
+  } finally {
+    db.close()
+  }
+})
+
+Deno.test('deleteSpanMovieCandidatesForEpisode clears one resolver version', () => {
+  const { db } = createTestDatabase('span-resolution-delete-candidates')
+
+  try {
+    seed(db)
+    upsertSpanMovieCandidates(db, [
+      candidate(),
+      candidate({
+        id: 'cand_other_version',
+        resolverVersion: 'span-movie-resolver-v2',
+      }),
+    ])
+
+    deleteSpanMovieCandidatesForEpisode(
+      db,
+      'ep_one',
+      'span-movie-resolver-v1',
+    )
+
+    const remaining = getSpanMovieCandidates(db, 'span_one')
+    assertEquals(remaining.length, 1)
+    assertEquals(remaining[0]?.resolverVersion, 'span-movie-resolver-v2')
+  } finally {
+    db.close()
+  }
+})

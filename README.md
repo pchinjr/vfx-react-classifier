@@ -111,6 +111,7 @@ deno task ingest:batch ./urls.txt
 deno task spans:build --episode ep_123
 deno task spans:list --episode ep_123
 deno task movies:search "Jurassic Park"
+deno task resolve:episode --episode ep_123 --force
 deno task query "Jurassic Park T-Rex"
 deno task reembed
 deno task db:init
@@ -162,6 +163,15 @@ deno task fmt
 - searches TMDb for canonical movie records
 - caches returned records in `movie_catalog`
 - upserts by TMDb movie ID so reruns update records without duplicating them
+
+`deno task resolve:episode --episode <episode-id>`
+
+- resolves stored discussion spans against TMDb movie candidates
+- writes one `span_resolution_runs` row for auditability
+- stores ranked candidates in `span_movie_candidates`
+- records confidence and evidence JSON for each candidate
+- accepts `--force` to replace existing candidates for the current resolver
+  version before rerunning
 
 `deno task query <text>`
 
@@ -225,6 +235,8 @@ Tables:
 - `segment_embeddings`
 - `discussion_spans`
 - `movie_catalog`
+- `span_resolution_runs`
+- `span_movie_candidates`
 
 Embeddings are stored as JSON for v1 simplicity. The repository layer keeps the
 storage boundary explicit so a vector database or Postgres can be added later.
@@ -294,8 +306,27 @@ When you run `deno task movies:search <query>`, the application:
 3. stores the records in `movie_catalog`
 4. prints the ranked TMDb candidates with title, year, source ID, and overview
 
-This milestone only establishes canonical lookup and local caching. It does not
-yet resolve discussion spans to candidates or create human-confirmed labels.
+## Span Resolution Flow
+
+When you run `deno task resolve:episode --episode <episode-id>`, the
+application:
+
+1. creates a `span_resolution_runs` row with resolver version and status
+2. loads stored discussion spans for the episode
+3. extracts title-like search queries from each eligible span
+4. searches TMDb for each query
+5. caches returned movies in `movie_catalog`
+6. ranks candidates with transparent confidence and evidence JSON
+7. upserts `span_movie_candidates` by span, movie, and resolver version
+
+This is a pragmatic first resolver, not a classifier. It is intentionally
+weighted and inspectable so bad matches can be debugged before manual labeling
+and training data collection are added.
+
+Use `--force` when resolver heuristics change and you want to delete stale
+candidates for the current resolver version before writing fresh results. Manual
+labels are stored separately in the next milestone, so this command only manages
+candidate rows.
 
 ## Architecture
 
@@ -409,6 +440,7 @@ The test suite currently covers:
 - English-only `yt-dlp` caption argument selection
 - deterministic discussion span generation and repository reruns
 - TMDb movie search mapping and movie catalog cache upserts
+- span movie candidate ranking and resolution run persistence
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -419,14 +451,14 @@ The test suite currently covers:
 - Raw search returns overlapping windows independently.
 - Discussion spans are currently time-based only and do not yet infer movie
   boundaries.
-- Movie catalog lookup is available, but discussion spans are not resolved to
-  movie candidates yet.
+- Span resolution is heuristic and title-phrase driven; it is expected to need
+  human review before labels are accepted.
+- Manual movie labels are not implemented yet.
 - Query scoring is currently in-process over all embeddings, which is fine for
   small corpora but not intended as the final scaling strategy.
 
 ## Suggested Next Steps
 
-- add span candidate resolution with evidence JSON
 - add manual span label confirmation
 - add episode-level resolution reports
 - move search candidates to a more scalable vector-aware backend when needed
