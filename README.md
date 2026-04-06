@@ -3,10 +3,11 @@
 Transcript-first semantic retrieval for Corridor Crew "VFX Artists React"
 episodes.
 
-This repository is the retrieval foundation for a future classifier system. The
-current version does not try to decide which movie a segment belongs to. It
-focuses on collecting transcript-aligned windows, embedding them, and returning
-the most semantically similar windows for a text query.
+This repository is the retrieval and movie-resolution foundation for a future
+classifier system. It ingests transcript-aligned windows, embeds them for
+semantic search, groups them into reviewable discussion spans, resolves
+candidate movies through TMDb, and supports a first optional learned reranker on
+top of manually confirmed labels.
 
 ## What This Does
 
@@ -21,20 +22,24 @@ For each ingested YouTube episode, the pipeline:
 6. stores metadata, cues, segments, and embeddings in SQLite
 7. answers semantic queries by embedding the query text and ranking segment
    embeddings by cosine similarity
+8. builds discussion spans from overlapping segments
+9. resolves movie candidates from TMDb for eligible spans
+10. allows manual span labels and offline reranker experiments
 
 ## What This Does Not Do Yet
 
 - no OCR
 - no frame or multimodal embeddings
-- no movie database integration
-- no title extraction into a canonical movie catalog
 - no UI
-- no segment merge / collapse pass on overlapping search hits
-- no classifier training or active learning
+- no fully automated labeling without human review
+- no raw transcript-to-movie classifier
+- no active learning dashboard
+- no franchise, cast, director, or visual-evidence fusion
 
 ## Scope
 
-This v1 builds the retrieval foundation:
+The current implementation covers the retrieval, canonical-candidate, manual
+labeling, and first reranker scaffolding layers:
 
 - ingest one or more YouTube episode URLs
 - fetch metadata and captions
@@ -43,9 +48,77 @@ This v1 builds the retrieval foundation:
 - generate embeddings for segments
 - persist episodes, cues, segments, and embeddings
 - run semantic search from a CLI query
+- merge segment windows into discussion spans
+- cache canonical TMDb movie records
+- store ranked span movie candidates with evidence
+- store manual movie labels
+- build feature vectors and train/evaluate a small reranker
 
-Non-goals for v1 include OCR, multimodal embeddings, movie metadata enrichment,
-and classifier training.
+Non-goals remain OCR, multimodal embeddings, UI work, end-to-end automatic
+classification, and active learning.
+
+## Implementation Phases and Learnings
+
+### Phase 1: Transcript Retrieval and Embeddings
+
+Built the core ingestion pipeline: YouTube metadata/caption fetch, transcript
+normalization, overlapping segment generation, OpenAI embeddings, SQLite
+persistence, and CLI semantic search.
+
+Challenge: broad subtitle matching with `en.*,en` caused `yt-dlp` to select
+translated English variants such as `en-it` and `en-pt-BR`, which were noisier
+and more likely to hit YouTube subtitle `429` failures.
+
+Solution: request only the explicit English subtitle track with `--sub-langs en`
+and prefer `json3/vtt/best`. The manual workaround that succeeded for early
+episodes became the default caption path and is covered by regression tests.
+
+### Phase 2: Canonical Movie Resolution MVP
+
+Added discussion spans, TMDb movie catalog caching, span resolution runs, ranked
+span movie candidates, manual span labels, and episode-level reports. The result
+is a reviewable movie-resolution workflow rather than a black-box classifier.
+
+Challenge: overlapping 30-second segment windows can chain together into a
+whole-episode span if merged only by overlap/gap.
+
+Solution: discussion span generation uses deterministic overlap/gap merging with
+a max-span guard, so episode 4’s 58 segments become 6 reviewable spans instead
+of one giant span.
+
+Challenge: canonical title matching can pick the wrong version of a title
+family. Episode 10 exposed this with candidates like `Independence Day` and
+`Mortal Kombat`, where the right title family appeared but the top canonical
+version was not necessarily the intended film.
+
+Solution: keep all candidates with transparent evidence and confidence, store
+manual labels separately, and preserve labels across resolver reruns. This
+created durable training data without pretending the heuristic resolver is fully
+reliable.
+
+### Phase 3: Learned Candidate Reranking
+
+Added a training dataset exporter, stable feature vectors, a dependency-free
+logistic-regression reranker, optional model-backed candidate reranking, and
+evaluation metrics comparing model ranking to the heuristic baseline.
+
+Challenge: model inference should not replace candidate generation. If the
+heuristic resolver produces no candidates, the model has nothing to rerank.
+Episode 1 still fails this way because the transcript is lowercase and
+repetitive, even though it contains obvious mentions like `game of thrones`,
+`dragon heart`, `sonic`, and `davey jones`.
+
+Solution: make the reranker additive and optional. The resolver still generates
+TMDb candidates first, then `--model <path>` reranks those candidates under a
+model-specific resolver version. The fallback heuristic path remains unchanged.
+
+Challenge: once model-specific candidate sets exist, reports and datasets can
+accidentally mix heuristic and model-ranked candidates.
+
+Solution: model-ranked outputs are stored under resolver versions such as
+`span-movie-resolver-v1+candidate-reranker@<version>`. Reports scope to the
+latest resolver version, dataset export defaults to the base heuristic resolver,
+and labeling commands accept `--resolver-version` for deliberate review.
 
 ## Requirements
 
