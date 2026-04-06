@@ -66,4 +66,21 @@ CREATE TABLE IF NOT EXISTS discussion_spans (
 
 CREATE INDEX IF NOT EXISTS idx_discussion_spans_episode_id
   ON discussion_spans (episode_id);
+
+CREATE TABLE IF NOT EXISTS movie_catalog (
+  id TEXT PRIMARY KEY,
+  source TEXT NOT NULL,
+  source_movie_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  original_title TEXT,
+  release_date TEXT,
+  release_year INTEGER,
+  overview TEXT,
+  metadata_json TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_movie_catalog_source_movie_id
+  ON movie_catalog (source, source_movie_id);
 `

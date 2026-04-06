@@ -88,6 +88,7 @@ The application reads configuration from `.env`. The most important values are:
 
 - `OPENAI_API_KEY`: required for embeddings and search queries
 - `OPENAI_EMBEDDING_MODEL`: defaults to `text-embedding-3-small`
+- `TMDB_API_KEY`: required for canonical movie search
 - `DATABASE_URL`: SQLite file path
 - `YTDLP_BINARY`: path to `yt-dlp`
 
@@ -109,6 +110,7 @@ deno task ingest "https://www.youtube.com/watch?v=VIDEO_ID"
 deno task ingest:batch ./urls.txt
 deno task spans:build --episode ep_123
 deno task spans:list --episode ep_123
+deno task movies:search "Jurassic Park"
 deno task query "Jurassic Park T-Rex"
 deno task reembed
 deno task db:init
@@ -155,6 +157,12 @@ deno task fmt
   text
 - intended as the first human-review checkpoint before movie resolution
 
+`deno task movies:search <query>`
+
+- searches TMDb for canonical movie records
+- caches returned records in `movie_catalog`
+- upserts by TMDb movie ID so reruns update records without duplicating them
+
 `deno task query <text>`
 
 - embeds the query text
@@ -192,6 +200,11 @@ Represents a larger reviewable transcript region produced by merging adjacent or
 overlapping segments for one episode. This is the first Phase 2 primitive for
 movie-aware resolution.
 
+### MovieCatalogRecord
+
+Represents one canonical movie record cached from TMDb. The local ID is stable,
+while `source` and `sourceMovieId` keep the external catalog identity explicit.
+
 ### SegmentEmbedding
 
 Represents one embedding vector for one segment for one embedding model.
@@ -211,6 +224,7 @@ Tables:
 - `segments`
 - `segment_embeddings`
 - `discussion_spans`
+- `movie_catalog`
 
 Embeddings are stored as JSON for v1 simplicity. The repository layer keeps the
 storage boundary explicit so a vector database or Postgres can be added later.
@@ -270,6 +284,18 @@ default max span duration is `180s`; override it with
 `--max-span-seconds <number>`. Use `--force` when you want to delete and replace
 existing spans for that episode. Manual movie labels are not implemented yet, so
 there is nothing to preserve in this first Phase 2 slice.
+
+## Movie Catalog Flow
+
+When you run `deno task movies:search <query>`, the application:
+
+1. searches TMDb's movie catalog
+2. maps returned movies into stable local `MovieCatalogRecord` rows
+3. stores the records in `movie_catalog`
+4. prints the ranked TMDb candidates with title, year, source ID, and overview
+
+This milestone only establishes canonical lookup and local caching. It does not
+yet resolve discussion spans to candidates or create human-confirmed labels.
 
 ## Architecture
 
@@ -382,6 +408,7 @@ The test suite currently covers:
 - integration-style search over fixture transcript data
 - English-only `yt-dlp` caption argument selection
 - deterministic discussion span generation and repository reruns
+- TMDb movie search mapping and movie catalog cache upserts
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -392,13 +419,13 @@ The test suite currently covers:
 - Raw search returns overlapping windows independently.
 - Discussion spans are currently time-based only and do not yet infer movie
   boundaries.
-- No movie extraction or catalog table exists yet.
+- Movie catalog lookup is available, but discussion spans are not resolved to
+  movie candidates yet.
 - Query scoring is currently in-process over all embeddings, which is fine for
   small corpora but not intended as the final scaling strategy.
 
 ## Suggested Next Steps
 
-- add movie catalog cache and external lookup
 - add span candidate resolution with evidence JSON
 - add manual span label confirmation
 - add episode-level resolution reports

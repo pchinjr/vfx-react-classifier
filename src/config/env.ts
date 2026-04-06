@@ -9,6 +9,7 @@ export type AppEnv = {
   ytDlpBinary: string
   ytDlpTimeoutMs: number
   openAiTimeoutMs: number
+  tmdbApiKey: string
   ingestTimeoutMs: number
   maxTranscriptCues: number
   maxSegmentsPerEpisode: number
@@ -33,6 +34,7 @@ export function getEnv(): AppEnv {
   const ytDlpBinary = Deno.env.get('YTDLP_BINARY')?.trim() || 'yt-dlp'
   const ytDlpTimeoutMs = Number(Deno.env.get('YTDLP_TIMEOUT_MS') ?? '30000')
   const openAiTimeoutMs = Number(Deno.env.get('OPENAI_TIMEOUT_MS') ?? '30000')
+  const tmdbApiKey = Deno.env.get('TMDB_API_KEY')?.trim() ?? ''
   const ingestTimeoutMs = Number(Deno.env.get('INGEST_TIMEOUT_MS') ?? '120000')
   const maxTranscriptCues = Number(
     Deno.env.get('MAX_TRANSCRIPT_CUES') ?? '20000',
@@ -48,6 +50,7 @@ export function getEnv(): AppEnv {
     ytDlpBinary,
     ytDlpTimeoutMs,
     openAiTimeoutMs,
+    tmdbApiKey,
     ingestTimeoutMs,
     maxTranscriptCues,
     maxSegmentsPerEpisode,
