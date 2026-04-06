@@ -64,6 +64,24 @@ export function replaceTranscriptCuesForEpisode(
   }
 }
 
+export function getTranscriptCuesForEpisode(
+  db: DatabaseClient,
+  episodeId: string,
+) {
+  return db.queryEntries<TranscriptCue>(
+    `
+    SELECT
+      start,
+      end,
+      text
+    FROM transcript_cues
+    WHERE episode_id = ?
+    ORDER BY cue_index ASC
+    `,
+    [episodeId],
+  )
+}
+
 export function getEpisodeByYouTubeVideoId(
   db: DatabaseClient,
   youtubeVideoId: string,

@@ -128,4 +128,17 @@ CREATE TABLE IF NOT EXISTS span_movie_labels (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_span_movie_labels_span_id
   ON span_movie_labels (span_id);
+
+CREATE TABLE IF NOT EXISTS v2_inference_windows (
+  id TEXT PRIMARY KEY,
+  episode_id TEXT NOT NULL,
+  start REAL NOT NULL,
+  end REAL NOT NULL,
+  text TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (episode_id) REFERENCES episodes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_v2_inference_windows_episode_id
+  ON v2_inference_windows (episode_id);
 `

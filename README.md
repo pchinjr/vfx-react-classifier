@@ -253,6 +253,7 @@ deno task spans:build --episode ep_123
 deno task spans:list --episode ep_123
 deno task movies:search "Jurassic Park"
 deno task resolve:episode --episode ep_123 --force
+deno task v2:windows --episode ep_123 --force --inspect
 deno task spans:candidates --span span_123
 deno task spans:label --span span_123 --candidate-rank 1
 deno task episode:report --episode ep_123
@@ -323,6 +324,15 @@ deno task fmt
   version before rerunning
 - accepts `--model <path>` to rerank generated candidates with a trained
   logistic reranker artifact
+
+`deno task v2:windows --episode <episode-id>`
+
+- builds V2 inference windows directly from stored normalized transcript cues
+- defaults to `45s` windows with a `15s` stride
+- stores windows in `v2_inference_windows`
+- accepts `--force` to replace stale V2 windows for the episode
+- accepts `--inspect` or `--list` to print stored window text after writing
+- accepts `--window-size-seconds <number>` and `--stride-seconds <number>`
 
 `deno task spans:candidates --span <span-id>`
 
@@ -669,6 +679,24 @@ This is the Phase 3 regression harness entrypoint. With the current tiny labeled
 dataset, it mainly validates the evaluation path; it becomes more meaningful as
 more manual labels are added.
 
+## V2 Semantic Inference Foundations
+
+V2 is being added alongside V1 rather than replacing it in place. V1 remains the
+baseline resolver and review workflow. V2 starts by reusing ingestion and
+transcript storage, then creating smaller inference windows that are intended
+for later semantic work-inference calls.
+
+When you run `deno task v2:windows --episode <episode-id>`, the application:
+
+1. loads stored normalized transcript cues for the episode
+2. creates deterministic overlapping inference windows
+3. writes `v2_inference_windows` rows
+4. optionally prints the stored windows for inspection
+
+This milestone intentionally does not call an LLM yet. The next V2 milestone is
+the semantic inference engine that turns each window into versioned structured
+work guesses with evidence.
+
 ## Architecture
 
 ```text
@@ -682,6 +710,11 @@ src/
     storage/
     search/
     catalog/
+  v2/
+    domain/
+    services/
+    storage/
+    cli/
   cli/
   lib/
   tests/
@@ -721,6 +754,11 @@ scripts/
 `src/services/catalog`
 
 - media-type-aware catalog search planning
+
+`src/v2`
+
+- semantic inference engine foundations, starting with transcript inference
+  windows
 
 `src/cli`
 
@@ -800,6 +838,7 @@ The test suite currently covers:
   query hygiene
 - Phase 5.1 resolver query quality tiers, conservative unknown-type search
   planning, and weak unknown-TV candidate filtering
+- V2 inference-window generation and persistence
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -828,6 +867,8 @@ The test suite currently covers:
 - Unknown media-type TV lookup is intentionally conservative; medium-quality
   unknown queries only try TV as an empty-movie-results fallback, and
   low-quality unknown queries do not broaden to TV.
+- V2 currently only builds inference windows; semantic model inference,
+  canonicalization, aggregation, and review decisions are not implemented yet.
 - Query scoring is currently in-process over all embeddings, which is fine for
   small corpora but not intended as the final scaling strategy.
 
@@ -838,6 +879,7 @@ The test suite currently covers:
   titles
 - add corpus-level fixtures for more weak unknown-TV false positives
 - add more manual labels and known-failure fixtures for episode 1 and episode 10
+- add V2 semantic work inference over persisted inference windows
 - move search candidates to a more scalable vector-aware backend when needed
 
 ## Notes
