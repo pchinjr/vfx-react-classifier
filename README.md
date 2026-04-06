@@ -229,6 +229,7 @@ The application reads configuration from `.env`. The most important values are:
 
 - `OPENAI_API_KEY`: required for embeddings and search queries
 - `OPENAI_EMBEDDING_MODEL`: defaults to `text-embedding-3-small`
+- `OPENAI_INFERENCE_MODEL`: defaults to `gpt-5-mini` for V2 work inference
 - `TMDB_API_KEY`: required for canonical movie search
 - `DATABASE_URL`: SQLite file path
 - `YTDLP_BINARY`: path to `yt-dlp`
@@ -254,6 +255,7 @@ deno task spans:list --episode ep_123
 deno task movies:search "Jurassic Park"
 deno task resolve:episode --episode ep_123 --force
 deno task v2:windows --episode ep_123 --force --inspect
+deno task v2:infer --episode ep_123 --force --limit 3 --inspect
 deno task spans:candidates --span span_123
 deno task spans:label --span span_123 --candidate-rank 1
 deno task episode:report --episode ep_123
@@ -333,6 +335,19 @@ deno task fmt
 - accepts `--force` to replace stale V2 windows for the episode
 - accepts `--inspect` or `--list` to print stored window text after writing
 - accepts `--window-size-seconds <number>` and `--stride-seconds <number>`
+
+`deno task v2:infer --episode <episode-id>`
+
+- runs the V2 semantic work inference prompt over stored V2 inference windows
+- writes versioned rows to `v2_work_inferences`
+- uses `OPENAI_INFERENCE_MODEL`, defaulting to `gpt-5-mini`
+- stores title guesses, media-type guesses, primary/secondary role, confidence,
+  transcript evidence snippets, rationale, model version, and prompt version
+- accepts `--force` to replace inferences for the current model and prompt
+- accepts `--limit <number>` for bounded smoke tests
+- accepts `--inspect` or `--list` to print persisted inferences after writing
+- accepts `--model <model>` and `--prompt-version <version>` for deliberate
+  version comparisons
 
 `deno task spans:candidates --span <span-id>`
 
@@ -693,9 +708,19 @@ When you run `deno task v2:windows --episode <episode-id>`, the application:
 3. writes `v2_inference_windows` rows
 4. optionally prints the stored windows for inspection
 
-This milestone intentionally does not call an LLM yet. The next V2 milestone is
-the semantic inference engine that turns each window into versioned structured
-work guesses with evidence.
+The second V2 slice adds model-backed semantic inference over those windows.
+Inference uses a versioned prompt and structured JSON output to persist:
+
+- title guess
+- media type: `movie`, `tv`, or `unknown`
+- role: `primary` or `secondary`
+- confidence
+- transcript evidence snippets
+- optional rationale
+- model and prompt versions
+
+This still does not canonicalize guesses to TMDb or aggregate neighboring
+windows. Those are separate milestones so V2 can be evaluated stage by stage.
 
 ## Architecture
 
@@ -839,6 +864,7 @@ The test suite currently covers:
 - Phase 5.1 resolver query quality tiers, conservative unknown-type search
   planning, and weak unknown-TV candidate filtering
 - V2 inference-window generation and persistence
+- V2 structured semantic work inference parsing and persistence
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -867,7 +893,7 @@ The test suite currently covers:
 - Unknown media-type TV lookup is intentionally conservative; medium-quality
   unknown queries only try TV as an empty-movie-results fallback, and
   low-quality unknown queries do not broaden to TV.
-- V2 currently only builds inference windows; semantic model inference,
+- V2 currently builds inference windows and raw semantic work inferences;
   canonicalization, aggregation, and review decisions are not implemented yet.
 - Query scoring is currently in-process over all embeddings, which is fine for
   small corpora but not intended as the final scaling strategy.
@@ -879,7 +905,7 @@ The test suite currently covers:
   titles
 - add corpus-level fixtures for more weak unknown-TV false positives
 - add more manual labels and known-failure fixtures for episode 1 and episode 10
-- add V2 semantic work inference over persisted inference windows
+- add V2 canonicalization from inferred title guesses to TMDb works
 - move search candidates to a more scalable vector-aware backend when needed
 
 ## Notes

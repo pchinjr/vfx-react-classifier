@@ -5,6 +5,7 @@ import { loadSync } from '@std/dotenv'
 export type AppEnv = {
   openAiApiKey: string
   openAiEmbeddingModel: string
+  openAiInferenceModel: string
   databaseUrl: string
   ytDlpBinary: string
   ytDlpTimeoutMs: number
@@ -29,6 +30,8 @@ export function getEnv(): AppEnv {
   const openAiApiKey = Deno.env.get('OPENAI_API_KEY')?.trim() ?? ''
   const openAiEmbeddingModel = Deno.env.get('OPENAI_EMBEDDING_MODEL')?.trim() ||
     'text-embedding-3-small'
+  const openAiInferenceModel = Deno.env.get('OPENAI_INFERENCE_MODEL')?.trim() ||
+    'gpt-5-mini'
   const databaseUrl = Deno.env.get('DATABASE_URL')?.trim() ||
     './data/vfx-react-engine.sqlite'
   const ytDlpBinary = Deno.env.get('YTDLP_BINARY')?.trim() || 'yt-dlp'
@@ -46,6 +49,7 @@ export function getEnv(): AppEnv {
   cachedEnv = {
     openAiApiKey,
     openAiEmbeddingModel,
+    openAiInferenceModel,
     databaseUrl,
     ytDlpBinary,
     ytDlpTimeoutMs,

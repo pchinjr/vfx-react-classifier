@@ -141,4 +141,22 @@ CREATE TABLE IF NOT EXISTS v2_inference_windows (
 
 CREATE INDEX IF NOT EXISTS idx_v2_inference_windows_episode_id
   ON v2_inference_windows (episode_id);
+
+CREATE TABLE IF NOT EXISTS v2_work_inferences (
+  id TEXT PRIMARY KEY,
+  window_id TEXT NOT NULL,
+  title_guess TEXT NOT NULL,
+  media_type TEXT NOT NULL,
+  role TEXT NOT NULL,
+  confidence REAL NOT NULL,
+  evidence_json TEXT NOT NULL,
+  rationale TEXT,
+  model_version TEXT NOT NULL,
+  prompt_version TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (window_id) REFERENCES v2_inference_windows(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_v2_work_inferences_window_id
+  ON v2_work_inferences (window_id);
 `
