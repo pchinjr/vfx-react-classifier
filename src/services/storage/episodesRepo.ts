@@ -97,3 +97,34 @@ export function getEpisodeByYouTubeVideoId(
     youtubeVideoId: row.youtube_video_id,
   }
 }
+
+export function getEpisodeById(db: DatabaseClient, episodeId: string) {
+  const rows = db.queryEntries<Episode & { youtube_video_id: string }>(
+    `
+    SELECT
+      id,
+      youtube_video_id,
+      title,
+      description,
+      channel_title AS channelTitle,
+      published_at AS publishedAt,
+      duration_seconds AS durationSeconds,
+      source_url AS sourceUrl,
+      created_at AS createdAt
+    FROM episodes
+    WHERE id = ?
+    LIMIT 1
+    `,
+    [episodeId],
+  )
+
+  const row = rows[0]
+  if (!row) {
+    return null
+  }
+
+  return {
+    ...row,
+    youtubeVideoId: row.youtube_video_id,
+  }
+}

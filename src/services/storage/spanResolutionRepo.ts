@@ -231,3 +231,90 @@ export function countSpanMovieCandidatesForEpisode(
     [episodeId],
   )[0]?.count ?? 0
 }
+
+export function countSpanMovieLabelsForEpisode(
+  db: DatabaseClient,
+  episodeId: string,
+) {
+  return db.queryEntries<{ count: number }>(
+    `
+    SELECT COUNT(*) AS count
+    FROM span_movie_labels sml
+    INNER JOIN discussion_spans ds ON ds.id = sml.span_id
+    WHERE ds.episode_id = ?
+    `,
+    [episodeId],
+  )[0]?.count ?? 0
+}
+
+export function getLatestSpanResolutionRunForEpisode(
+  db: DatabaseClient,
+  episodeId: string,
+) {
+  return db.queryEntries<SpanResolutionRun>(
+    `
+    SELECT
+      id,
+      episode_id AS episodeId,
+      resolver_version AS resolverVersion,
+      started_at AS startedAt,
+      completed_at AS completedAt,
+      status,
+      notes
+    FROM span_resolution_runs
+    WHERE episode_id = ?
+    ORDER BY started_at DESC
+    LIMIT 1
+    `,
+    [episodeId],
+  )[0] ?? null
+}
+
+export function getEpisodeSpanResolutionRows(
+  db: DatabaseClient,
+  episodeId: string,
+) {
+  return db.queryEntries<{
+    spanId: string
+    start: number
+    end: number
+    candidateCount: number
+    labelTitle?: string
+    labelSource?: string
+    labelConfidence?: number
+    topCandidateTitle?: string
+    topCandidateConfidence?: number
+  }>(
+    `
+    SELECT
+      ds.id AS spanId,
+      ds.start,
+      ds.end,
+      COUNT(smc.id) AS candidateCount,
+      label_movie.title AS labelTitle,
+      sml.label_source AS labelSource,
+      sml.confidence AS labelConfidence,
+      top_movie.title AS topCandidateTitle,
+      top_candidate.confidence AS topCandidateConfidence
+    FROM discussion_spans ds
+    LEFT JOIN span_movie_candidates smc ON smc.span_id = ds.id
+    LEFT JOIN span_movie_candidates top_candidate ON
+      top_candidate.span_id = ds.id AND top_candidate.rank = 1
+    LEFT JOIN movie_catalog top_movie ON top_movie.id = top_candidate.movie_id
+    LEFT JOIN span_movie_labels sml ON sml.span_id = ds.id
+    LEFT JOIN movie_catalog label_movie ON label_movie.id = sml.movie_id
+    WHERE ds.episode_id = ?
+    GROUP BY
+      ds.id,
+      ds.start,
+      ds.end,
+      label_movie.title,
+      sml.label_source,
+      sml.confidence,
+      top_movie.title,
+      top_candidate.confidence
+    ORDER BY ds.start ASC
+    `,
+    [episodeId],
+  )
+}

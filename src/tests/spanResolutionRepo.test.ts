@@ -13,8 +13,11 @@ import { upsertMovieCatalogRecords } from '../services/storage/movieCatalogRepo.
 import {
   completeSpanResolutionRun,
   countSpanMovieCandidatesForEpisode,
+  countSpanMovieLabelsForEpisode,
   createSpanResolutionRun,
   deleteSpanMovieCandidatesForEpisode,
+  getEpisodeSpanResolutionRows,
+  getLatestSpanResolutionRunForEpisode,
   getSpanMovieCandidateByRank,
   getSpanMovieCandidates,
   getSpanMovieLabel,
@@ -113,6 +116,10 @@ Deno.test('span resolution runs can be completed', () => {
       )[0],
       { status: 'completed', notes: 'ok' },
     )
+    assertEquals(
+      getLatestSpanResolutionRunForEpisode(db, 'ep_one')?.status,
+      'completed',
+    )
   } finally {
     db.close()
   }
@@ -173,6 +180,27 @@ Deno.test('upsertSpanMovieLabel keeps one confirmed label per span', () => {
     assertEquals(confirmed?.movieTitle, 'Jurassic Park')
     assertEquals(confirmed?.confidence, 0.8)
     assertEquals(confirmed?.labelSource, 'manual')
+    assertEquals(countSpanMovieLabelsForEpisode(db, 'ep_one'), 1)
+  } finally {
+    db.close()
+  }
+})
+
+Deno.test('getEpisodeSpanResolutionRows returns report rows', () => {
+  const { db } = createTestDatabase('span-resolution-report-rows')
+
+  try {
+    seed(db)
+    upsertSpanMovieCandidates(db, [candidate()])
+    upsertSpanMovieLabel(db, label())
+
+    const rows = getEpisodeSpanResolutionRows(db, 'ep_one')
+    assertEquals(rows.length, 1)
+    assertEquals(rows[0]?.spanId, 'span_one')
+    assertEquals(rows[0]?.candidateCount, 1)
+    assertEquals(rows[0]?.topCandidateTitle, 'Jurassic Park')
+    assertEquals(rows[0]?.labelTitle, 'Jurassic Park')
+    assertEquals(rows[0]?.labelSource, 'manual')
   } finally {
     db.close()
   }

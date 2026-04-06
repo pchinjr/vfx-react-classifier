@@ -114,6 +114,7 @@ deno task movies:search "Jurassic Park"
 deno task resolve:episode --episode ep_123 --force
 deno task spans:candidates --span span_123
 deno task spans:label --span span_123 --candidate-rank 1
+deno task episode:report --episode ep_123
 deno task query "Jurassic Park T-Rex"
 deno task reembed
 deno task db:init
@@ -187,6 +188,12 @@ deno task fmt
 - confirms one ranked candidate as the current manual label for a span
 - stores the label in `span_movie_labels`
 - upserts by span ID so changing a manual label is deliberate and idempotent
+
+`deno task episode:report --episode <episode-id>`
+
+- summarizes spans, candidate coverage, confirmed labels, and unlabeled spans
+- prints the latest resolver run status and notes
+- lists each span with its candidate count, top candidate, and confirmed label
 
 `deno task query <text>`
 
@@ -373,6 +380,18 @@ the application:
 Resolver reruns preserve manual labels because candidate rows and label rows are
 separate tables.
 
+## Episode Report Flow
+
+When you run `deno task episode:report --episode <episode-id>`, the application:
+
+1. loads episode metadata
+2. counts discussion spans, candidate rows, and confirmed labels
+3. prints the latest resolution run for operational visibility
+4. prints a compact row for each span with candidate and label status
+
+This command is read-only and is intended as the checkpoint after span
+resolution and manual labeling.
+
 ## Architecture
 
 ```text
@@ -487,6 +506,7 @@ The test suite currently covers:
 - TMDb movie search mapping and movie catalog cache upserts
 - span movie candidate ranking and resolution run persistence
 - manual span label confirmation and rerun preservation
+- episode-level reporting
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -505,7 +525,8 @@ The test suite currently covers:
 
 ## Suggested Next Steps
 
-- add episode-level resolution reports
+- add richer candidate resolution heuristics for person names and one-word
+  titles
 - move search candidates to a more scalable vector-aware backend when needed
 
 ## Notes

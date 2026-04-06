@@ -3,6 +3,7 @@ import { assertEquals } from '@std/assert'
 import { nowIso } from '../lib/time.ts'
 import { createTestDatabase } from '../services/storage/testDb.ts'
 import {
+  getEpisodeById,
   getEpisodeByYouTubeVideoId,
   upsertEpisode,
 } from '../services/storage/episodesRepo.ts'
@@ -30,6 +31,7 @@ Deno.test('upsertEpisode updates an existing episode instead of duplicating it',
 
     const episode = getEpisodeByYouTubeVideoId(db, 'abc123')
     assertEquals(episode?.title, 'Updated Title')
+    assertEquals(getEpisodeById(db, 'ep_two')?.title, 'Updated Title')
     assertEquals(
       db.queryEntries<{ count: number }>(
         'SELECT COUNT(*) AS count FROM episodes WHERE youtube_video_id = ?',
