@@ -169,6 +169,19 @@ Solution: added a pre-lookup query-hygiene pass. Alias-backed queries are kept,
 known noisy precision phrases are blocked before TMDb calls, and kept candidates
 store hygiene evidence such as `queryHygieneScore` and `queryHygieneReason`.
 
+Post-implementation validation: rerunning resolver v3 across all 9 existing
+episodes produced 54 discussion spans, 19 spans with candidates, 59 total
+candidates, and 1 preserved manual label. Candidate media types were 56 movie
+and 3 TV. The known episode 1 `Game of Thrones` span now resolves to a TV
+candidate, and the episode 2 `Will Smith` / `Budapest` noise no longer persists
+as a v3 candidate.
+
+New caveat: unknown media-type queries can now search both movie and TV, which
+improves recall but can introduce weak TV matches. The first full rerun exposed
+examples such as `VFX Artists React` and `Newton's Cradle` as TV candidates in
+episode 3, so unknown-query TV routing needs an additional quality gate or more
+conservative search policy.
+
 ## Requirements
 
 - Deno 2.x
@@ -798,6 +811,9 @@ The test suite currently covers:
   records now carry `media_type` and can represent TV works.
 - Query hygiene is intentionally conservative and denylist-backed; it blocks
   known noisy precision phrases but is not a general title-quality model.
+- Unknown media-type queries may search both movie and TV; this recovered TV
+  references but also introduced some weak TV candidates that need a stricter
+  routing or ranking gate.
 - Query scoring is currently in-process over all embeddings, which is fine for
   small corpora but not intended as the final scaling strategy.
 
@@ -806,6 +822,7 @@ The test suite currently covers:
 - finish the work-catalog rename when the schema is ready for a larger migration
 - add richer candidate resolution heuristics for person names and one-word
   titles
+- add a stricter quality gate for unknown media-type TV searches
 - add more manual labels and known-failure fixtures for episode 1 and episode 10
 - move search candidates to a more scalable vector-aware backend when needed
 
