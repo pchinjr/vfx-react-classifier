@@ -135,7 +135,7 @@ Deno.test('buildCandidateTrainingRows creates positive and negative rows from ma
     assertEquals(rows[0]?.voteCount, 1800)
     assertEquals(rows[0]?.split, splitForSpan('span_one'))
     assertEquals(
-      JSON.parse(rows[0]?.featureJson ?? '{}').heuristicRank,
+      JSON.parse(rows[0]?.featureJson ?? '{}').values.heuristicRank,
       1,
     )
   } finally {

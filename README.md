@@ -116,6 +116,7 @@ deno task spans:candidates --span span_123
 deno task spans:label --span span_123 --candidate-rank 1
 deno task episode:report --episode ep_123
 deno task ml:build-dataset --out artifacts/ml/candidate-training.jsonl
+deno task ml:features --span span_123
 deno task query "Jurassic Park T-Rex"
 deno task reembed
 deno task db:init
@@ -204,6 +205,12 @@ deno task fmt
 - includes deterministic `train`, `validation`, or `test` splits by span ID
 - accepts `--out <path>`, defaulting to `artifacts/ml/candidate-training.jsonl`
 
+`deno task ml:features --span <span-id>`
+
+- builds the stable Phase 3 feature vector for each candidate attached to a span
+- prints schema version, feature order, and numeric feature values
+- is read-only and intended for debugging candidate reranking inputs
+
 `deno task query <text>`
 
 - embeds the query text
@@ -261,6 +268,11 @@ stored separately from candidates so resolver reruns do not erase manual review.
 Represents one Phase 3 training example for a span-candidate pair. Rows are
 derived only from manually labeled spans and exported as JSONL for offline model
 training.
+
+### CandidateFeatureVector
+
+Represents the stable numeric Phase 3 feature schema for one span-candidate
+pair. The current schema is `candidate-features-v1`.
 
 ### SegmentEmbedding
 
@@ -420,6 +432,19 @@ When you run `deno task ml:build-dataset`, the application:
 This is the first Phase 3 primitive. It prepares labeled data for a future
 candidate reranker, but it does not train or run a model yet.
 
+## ML Feature Flow
+
+When you run `deno task ml:features --span <span-id>`, the application:
+
+1. loads the span's stored movie candidates
+2. joins each candidate to TMDb cache metadata
+3. computes a stable numeric feature vector for each candidate
+4. prints the feature schema version and feature order
+
+The feature vector includes heuristic rank/confidence, title and overview
+overlap, exact title mentions, comparative-context flags, popularity, vote
+count, candidate-set size, and duplicate normalized-title counts.
+
 ## Architecture
 
 ```text
@@ -536,6 +561,7 @@ The test suite currently covers:
 - manual span label confirmation and rerun preservation
 - episode-level reporting
 - Phase 3 candidate training dataset export
+- Phase 3 candidate feature vector generation
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -557,7 +583,7 @@ The test suite currently covers:
 
 - add richer candidate resolution heuristics for person names and one-word
   titles
-- add stable candidate feature vectors for Phase 3 reranking
+- add a baseline reranker trainer using the exported Phase 3 feature vectors
 - move search candidates to a more scalable vector-aware backend when needed
 
 ## Notes
