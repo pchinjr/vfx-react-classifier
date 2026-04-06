@@ -62,6 +62,8 @@ export function getCanonicalWorkMatchesForEpisode(
   return db.queryEntries<
     CanonicalWorkMatch & {
       titleGuess: string
+      role: string
+      inferenceConfidence: number
       canonicalTitle: string
       mediaType: string
       releaseYear?: number
@@ -77,6 +79,8 @@ export function getCanonicalWorkMatchesForEpisode(
       cwm.match_confidence AS matchConfidence,
       cwm.created_at AS createdAt,
       wi.title_guess AS titleGuess,
+      wi.role,
+      wi.confidence AS inferenceConfidence,
       mc.title AS canonicalTitle,
       mc.media_type AS mediaType,
       mc.release_year AS releaseYear,

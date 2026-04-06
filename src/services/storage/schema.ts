@@ -172,4 +172,21 @@ CREATE TABLE IF NOT EXISTS v2_canonical_work_matches (
 
 CREATE INDEX IF NOT EXISTS idx_v2_canonical_work_matches_inference_id
   ON v2_canonical_work_matches (inference_id);
+
+CREATE TABLE IF NOT EXISTS v2_aggregated_discussions (
+  id TEXT PRIMARY KEY,
+  episode_id TEXT NOT NULL,
+  work_id TEXT NOT NULL,
+  media_type TEXT NOT NULL,
+  start REAL NOT NULL,
+  end REAL NOT NULL,
+  role TEXT NOT NULL,
+  confidence REAL NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (episode_id) REFERENCES episodes(id) ON DELETE CASCADE,
+  FOREIGN KEY (work_id) REFERENCES movie_catalog(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_v2_aggregated_discussions_episode_id
+  ON v2_aggregated_discussions (episode_id);
 `

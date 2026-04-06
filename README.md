@@ -257,6 +257,8 @@ deno task resolve:episode --episode ep_123 --force
 deno task v2:windows --episode ep_123 --force --inspect
 deno task v2:infer --episode ep_123 --force --limit 3 --inspect
 deno task v2:canonicalize --episode ep_123 --force --inspect
+deno task v2:aggregate --episode ep_123
+deno task v2:report --episode ep_123
 deno task spans:candidates --span span_123
 deno task spans:label --span span_123 --candidate-rank 1
 deno task episode:report --episode ep_123
@@ -360,6 +362,21 @@ deno task fmt
   confidence can be inspected independently
 - accepts `--force` to replace canonical matches for the episode
 - accepts `--inspect` or `--list` to print canonical matches after writing
+
+`deno task v2:aggregate --episode <episode-id>`
+
+- merges neighboring V2 canonical matches for the same work and role
+- writes merged regions to `v2_aggregated_discussions`
+- defaults to a `30s` maximum gap between neighboring matched windows
+- accepts `--max-gap-seconds <number>` to tune merge strictness
+- prints the aggregated discussion regions after writing
+
+`deno task v2:report --episode <episode-id>`
+
+- summarizes V2 windows, raw inferences, canonical matches, and aggregated
+  discussions
+- prints each aggregated discussion with timestamp, canonical title, media type,
+  role, and confidence
 
 `deno task spans:candidates --span <span-id>`
 
@@ -741,6 +758,12 @@ destroying the original model output.
 V2 still does not aggregate neighboring windows. That is a separate milestone so
 window-level inference and catalog grounding can be evaluated independently.
 
+The fourth V2 slice adds aggregation and reporting. Canonical matches from
+neighboring windows are merged when they refer to the same catalog work and
+role, which produces the first V2 discussion-region output. This replaces the V1
+phrase-first span as the eventual review target while keeping the raw inference
+and canonicalization layers available for debugging.
+
 ## Architecture
 
 ```text
@@ -885,6 +908,7 @@ The test suite currently covers:
 - V2 inference-window generation and persistence
 - V2 structured semantic work inference parsing and persistence
 - V2 canonicalization from semantic title guesses to TMDb catalog records
+- V2 aggregation and episode-level reporting over canonical matches
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -913,9 +937,9 @@ The test suite currently covers:
 - Unknown media-type TV lookup is intentionally conservative; medium-quality
   unknown queries only try TV as an empty-movie-results fallback, and
   low-quality unknown queries do not broaden to TV.
-- V2 currently builds inference windows, raw semantic work inferences, and
-  canonical TMDb matches; aggregation and review decisions are not implemented
-  yet.
+- V2 currently builds inference windows, raw semantic work inferences, canonical
+  TMDb matches, and aggregated discussion regions; review decisions and
+  evaluation are not implemented yet.
 - Query scoring is currently in-process over all embeddings, which is fine for
   small corpora but not intended as the final scaling strategy.
 
@@ -926,7 +950,7 @@ The test suite currently covers:
   titles
 - add corpus-level fixtures for more weak unknown-TV false positives
 - add more manual labels and known-failure fixtures for episode 1 and episode 10
-- add V2 aggregation across neighboring windows with repeated canonical matches
+- add V2 review decisions for confirmed, corrected, and rejected outputs
 - move search candidates to a more scalable vector-aware backend when needed
 
 ## Notes
