@@ -10,6 +10,7 @@ export function filterResolverQueriesForLookup(queries: ResolverQuery[]) {
 
     return [{
       ...query,
+      qualityTier: quality.tier,
       hygieneScore: quality.score,
       hygieneReason: quality.reason,
     }]

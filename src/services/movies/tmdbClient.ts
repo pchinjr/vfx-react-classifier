@@ -5,6 +5,8 @@ import type {
 import { AppError } from '../../lib/errors.ts'
 import { makeId } from '../../lib/ids.ts'
 import { nowIso } from '../../lib/time.ts'
+import { chooseCatalogSearchPlan } from '../catalog/chooseCatalogSearchPlan.ts'
+import type { ResolverQueryQualityTier } from '../resolver/queryTypes.ts'
 
 type TmdbMovieResult = {
   id: number
@@ -39,6 +41,7 @@ export type TmdbWorkMediaTypeHint = CatalogMediaType | 'unknown'
 
 export type SearchTmdbWorksOptions = SearchTmdbMoviesOptions & {
   mediaTypeHint?: TmdbWorkMediaTypeHint
+  queryQualityTier?: ResolverQueryQualityTier
 }
 
 function releaseYearFromDate(releaseDate?: string) {
@@ -161,19 +164,32 @@ export async function searchTmdbWorks(
   query: string,
   options: SearchTmdbWorksOptions,
 ): Promise<MovieCatalogRecord[]> {
-  const mediaTypeHint = options.mediaTypeHint ?? 'unknown'
+  const plan = chooseCatalogSearchPlan({
+    mediaTypeHint: options.mediaTypeHint ?? 'unknown',
+    qualityTier: options.queryQualityTier,
+  })
 
-  if (mediaTypeHint === 'movie') {
-    return await searchTmdbMovies(query, options)
-  }
-
-  if (mediaTypeHint === 'tv') {
+  if (plan.first === 'tv') {
     return await searchTmdbTv(query, options)
   }
 
-  const [movies, tv] = await Promise.all([
-    searchTmdbMovies(query, options),
-    searchTmdbTv(query, options),
-  ])
+  if (!plan.allowTvSearch) {
+    return await searchTmdbMovies(query, options)
+  }
+
+  if (plan.searchBoth) {
+    const [movies, tv] = await Promise.all([
+      searchTmdbMovies(query, options),
+      searchTmdbTv(query, options),
+    ])
+    return [...movies, ...tv].slice(0, options.limit ?? 10)
+  }
+
+  const movies = await searchTmdbMovies(query, options)
+  if (!plan.fallbackToTvWhenMovieResultsWeak || movies.length > 0) {
+    return movies
+  }
+
+  const tv = await searchTmdbTv(query, options)
   return [...movies, ...tv].slice(0, options.limit ?? 10)
 }

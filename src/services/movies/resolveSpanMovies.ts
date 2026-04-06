@@ -6,13 +6,14 @@ import type {
 } from '../../domain/spanResolution.ts'
 import { makeId } from '../../lib/ids.ts'
 import { nowIso } from '../../lib/time.ts'
+import { chooseCatalogSearchPlan } from '../catalog/chooseCatalogSearchPlan.ts'
 import { buildResolverQueries } from '../resolver/buildResolverQueries.ts'
+import { filterResolvedCandidatesBeforePersist } from '../resolver/filterResolvedCandidatesBeforePersist.ts'
 import { filterResolverQueriesForLookup } from '../resolver/filterResolverQueriesForLookup.ts'
 import type { ResolverQuery } from '../resolver/queryTypes.ts'
 import { normalizeResolverText } from '../resolver/text.ts'
 
 export const SPAN_MOVIE_RESOLVER_VERSION = 'span-movie-resolver-v3'
-const MIN_TITLE_SIMILARITY = 0.6
 
 export type MovieSearchFn = (
   query: string,
@@ -87,6 +88,10 @@ function confidenceFor(
   movie: MovieCatalogRecord,
   resolverVersion: string,
 ): ScoredCandidate {
+  const searchPlan = chooseCatalogSearchPlan({
+    mediaTypeHint: query.mediaTypeHint ?? 'unknown',
+    qualityTier: query.qualityTier,
+  })
   const titleScore = titleSimilarity(query.query, movie)
   const overviewScore = movie.overview
     ? overlapScore(span.text, movie.overview)
@@ -122,8 +127,11 @@ function confidenceFor(
       filterPassed: true,
       mediaType: movie.mediaType,
       mediaTypeHint: query.mediaTypeHint,
+      queryQualityTier: query.qualityTier,
       queryHygieneScore: query.hygieneScore,
       queryHygieneReason: query.hygieneReason,
+      catalogSearchPlan: searchPlan.name,
+      tvSearchAllowed: searchPlan.allowTvSearch,
     },
   }
 }
@@ -167,11 +175,9 @@ export async function resolveSpanMovieCandidates(
     }
   }
 
-  const ranked = [...scoredByMovieId.values()]
-    .filter((candidate) =>
-      candidate.confidence > 0 &&
-      candidate.evidence.titleSimilarity >= MIN_TITLE_SIMILARITY
-    )
+  const ranked = filterResolvedCandidatesBeforePersist([
+    ...scoredByMovieId.values(),
+  ])
     .sort((left, right) =>
       right.confidence - left.confidence ||
       left.movie.title.localeCompare(right.movie.title)

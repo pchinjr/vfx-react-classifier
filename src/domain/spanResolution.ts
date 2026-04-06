@@ -23,8 +23,12 @@ export type SpanMovieCandidateEvidence = {
   filterPassed?: boolean
   mediaType?: string
   mediaTypeHint?: string
+  queryQualityTier?: string
   queryHygieneScore?: number
   queryHygieneReason?: string
+  catalogSearchPlan?: string
+  tvSearchAllowed?: boolean
+  droppedReason?: string
 }
 
 export type SpanMovieCandidate = {
