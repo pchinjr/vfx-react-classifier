@@ -129,7 +129,29 @@ async function findSubtitleFile(tempDir: string, videoId: string) {
   return candidates.sort((left, right) => left.localeCompare(right))[0]
 }
 
+export function buildYtDlpCaptionArgs(tempDir: string, urlOrVideoId: string) {
+  // Keep caption selection narrow. `en.*,en` can pull translated tracks like
+  // `en-it`; this corpus only needs native English captions or auto-captions.
+  return [
+    '--skip-download',
+    '--no-warnings',
+    '--write-subs',
+    '--write-auto-subs',
+    '--sub-langs',
+    'en',
+    '--sub-format',
+    // JSON3 is smaller and avoids some VTT markup noise, but VTT is still a
+    // useful fallback because older or unusual videos may not expose JSON3.
+    'json3/vtt/best',
+    '--output',
+    join(tempDir, '%(id)s.%(ext)s'),
+    urlOrVideoId,
+  ]
+}
+
 // Caption fetch prefers YouTube subtitles because they are cheap and aligned.
+// Request only the explicit English track; translated variants like `en-it`
+// have been noisier and more prone to YouTube 429s for this workflow.
 // A hard cue cap prevents extreme files from being accepted silently.
 export async function fetchCaptions(
   urlOrVideoId: string,
@@ -139,19 +161,10 @@ export async function fetchCaptions(
   const videoId = parseYouTubeVideoId(urlOrVideoId) || urlOrVideoId
 
   try {
-    await runYtDlp(ytDlpBinary, [
-      '--skip-download',
-      '--no-warnings',
-      '--write-subs',
-      '--write-auto-subs',
-      '--sub-langs',
-      'en.*,en',
-      '--sub-format',
-      'vtt/json3/best',
-      '--output',
-      join(tempDir, '%(id)s.%(ext)s'),
-      urlOrVideoId,
-    ])
+    await runYtDlp(
+      ytDlpBinary,
+      buildYtDlpCaptionArgs(tempDir, urlOrVideoId),
+    )
 
     const subtitlePath = await findSubtitleFile(tempDir, videoId)
     if (!subtitlePath) {

@@ -13,7 +13,8 @@ the most semantically similar windows for a text query.
 For each ingested YouTube episode, the pipeline:
 
 1. fetches video metadata with `yt-dlp`
-2. fetches English captions or auto-captions with `yt-dlp`
+2. fetches the explicit English subtitle track or English auto-captions with
+   `yt-dlp`
 3. normalizes the caption stream into cleaner cues
 4. segments the cues into overlapping time windows
 5. embeds each segment with OpenAI embeddings
@@ -195,7 +196,8 @@ When you run `deno task ingest <url>`, the application does the following:
 
 1. parse the YouTube video ID from the URL
 2. ask `yt-dlp` for video metadata
-3. ask `yt-dlp` for English subtitles or auto-subtitles
+3. ask `yt-dlp` for only the explicit English subtitle track or English
+   auto-subtitles
 4. parse VTT or JSON3 subtitles into `TranscriptCue[]`
 5. normalize caption text and merge obvious repetition
 6. generate overlapping transcript segments
@@ -206,6 +208,15 @@ When you run `deno task ingest <url>`, the application does the following:
 
 If the embedding step fails, earlier persisted data remains in the database and
 you can resume later with `deno task reembed`.
+
+### Caption Selection
+
+The ingest path intentionally requests only `--sub-langs en` from `yt-dlp`.
+Earlier broad matching with `en.*,en` could select translated variants such as
+`en-it` or `en-pt-BR`, which proved noisier and more likely to hit YouTube
+subtitle `429` failures. The current path prefers `json3` subtitles, falls back
+to `vtt`, and still allows YouTube English auto-captions when no authored
+English subtitle track is available.
 
 ## Search Flow
 
@@ -329,6 +340,7 @@ The test suite currently covers:
 - cosine similarity
 - repository upsert behavior
 - integration-style search over fixture transcript data
+- English-only `yt-dlp` caption argument selection
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
