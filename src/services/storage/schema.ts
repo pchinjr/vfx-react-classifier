@@ -52,4 +52,18 @@ CREATE TABLE IF NOT EXISTS segment_embeddings (
 
 CREATE INDEX IF NOT EXISTS idx_segment_embeddings_segment_id
   ON segment_embeddings (segment_id);
+
+CREATE TABLE IF NOT EXISTS discussion_spans (
+  id TEXT PRIMARY KEY,
+  episode_id TEXT NOT NULL,
+  start REAL NOT NULL,
+  end REAL NOT NULL,
+  text TEXT NOT NULL,
+  source_segment_count INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (episode_id) REFERENCES episodes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_discussion_spans_episode_id
+  ON discussion_spans (episode_id);
 `

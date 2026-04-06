@@ -107,6 +107,8 @@ conditions or malformed inputs.
 ```bash
 deno task ingest "https://www.youtube.com/watch?v=VIDEO_ID"
 deno task ingest:batch ./urls.txt
+deno task spans:build --episode ep_123
+deno task spans:list --episode ep_123
 deno task query "Jurassic Park T-Rex"
 deno task reembed
 deno task db:init
@@ -136,6 +138,22 @@ deno task fmt
 
 - reads newline-separated URLs from a file
 - ingests them sequentially
+
+`deno task spans:build --episode <episode-id>`
+
+- merges existing overlapping transcript segments into discussion spans
+- uses a deterministic time-gap merge rule, defaulting to `15s`
+- caps span duration at `180s` by default so sliding-window segments do not
+  chain into one whole-episode span
+- upserts spans by stable IDs so reruns do not create duplicates
+- accepts `--force` to replace stale spans for an episode after segmentation
+  settings change
+
+`deno task spans:list --episode <episode-id>`
+
+- prints stored discussion spans with timestamps, source segment counts, and
+  text
+- intended as the first human-review checkpoint before movie resolution
 
 `deno task query <text>`
 
@@ -168,6 +186,12 @@ Represents one caption cue with a start time, end time, and text.
 Represents one overlapping transcript window, usually `30s` wide with a `15s`
 stride.
 
+### DiscussionSpan
+
+Represents a larger reviewable transcript region produced by merging adjacent or
+overlapping segments for one episode. This is the first Phase 2 primitive for
+movie-aware resolution.
+
 ### SegmentEmbedding
 
 Represents one embedding vector for one segment for one embedding model.
@@ -186,6 +210,7 @@ Tables:
 - `transcript_cues`
 - `segments`
 - `segment_embeddings`
+- `discussion_spans`
 
 Embeddings are stored as JSON for v1 simplicity. The repository layer keeps the
 storage boundary explicit so a vector database or Postgres can be added later.
@@ -230,6 +255,21 @@ When you run `deno task query <text>`, the application:
 
 Because transcript segmentation overlaps, nearby windows often appear together
 in the output. That behavior is expected in the current version.
+
+## Discussion Span Flow
+
+When you run `deno task spans:build --episode <episode-id>`, the application:
+
+1. loads stored segments for the episode
+2. sorts them by time
+3. merges segments that overlap or are within the configured gap
+4. stores deterministic `discussion_spans` rows
+
+The default max gap is `15s`; override it with `--max-gap-seconds <number>`. The
+default max span duration is `180s`; override it with
+`--max-span-seconds <number>`. Use `--force` when you want to delete and replace
+existing spans for that episode. Manual movie labels are not implemented yet, so
+there is nothing to preserve in this first Phase 2 slice.
 
 ## Architecture
 
@@ -341,6 +381,7 @@ The test suite currently covers:
 - repository upsert behavior
 - integration-style search over fixture transcript data
 - English-only `yt-dlp` caption argument selection
+- deterministic discussion span generation and repository reruns
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -348,17 +389,19 @@ The test suite currently covers:
 
 - Search quality depends heavily on subtitle quality.
 - Some YouTube subtitles are noisy or repetitive.
-- Search returns overlapping windows independently.
+- Raw search returns overlapping windows independently.
+- Discussion spans are currently time-based only and do not yet infer movie
+  boundaries.
 - No movie extraction or catalog table exists yet.
 - Query scoring is currently in-process over all embeddings, which is fine for
   small corpora but not intended as the final scaling strategy.
 
 ## Suggested Next Steps
 
-- add transcript dedup/compression for noisy auto-captions
-- add catalog/status commands for partial ingests
-- add movie-title extraction into a separate entity table
-- add result collapsing for overlapping windows
+- add movie catalog cache and external lookup
+- add span candidate resolution with evidence JSON
+- add manual span label confirmation
+- add episode-level resolution reports
 - move search candidates to a more scalable vector-aware backend when needed
 
 ## Notes

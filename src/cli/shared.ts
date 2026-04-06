@@ -15,6 +15,20 @@ export function parseStringFlag(args: string[], flag: string) {
   return args[index + 1] ?? null
 }
 
+export function parseNumberFlag(args: string[], flag: string) {
+  const value = parseStringFlag(args, flag)
+  if (!value) {
+    return null
+  }
+
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Invalid numeric value for ${flag}: ${value}`)
+  }
+
+  return parsed
+}
+
 // Query output is intentionally plain text so it works well in terminals and
 // stays easy to redirect into files later if needed.
 export function printSearchResults(results: SearchResult[]) {
