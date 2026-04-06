@@ -117,6 +117,7 @@ deno task spans:label --span span_123 --candidate-rank 1
 deno task episode:report --episode ep_123
 deno task ml:build-dataset --out artifacts/ml/candidate-training.jsonl
 deno task ml:features --span span_123
+deno task ml:train --dataset artifacts/ml/candidate-training.jsonl --out artifacts/ml/reranker-baseline.json
 deno task query "Jurassic Park T-Rex"
 deno task reembed
 deno task db:init
@@ -210,6 +211,15 @@ deno task fmt
 - builds the stable Phase 3 feature vector for each candidate attached to a span
 - prints schema version, feature order, and numeric feature values
 - is read-only and intended for debugging candidate reranking inputs
+
+`deno task ml:train`
+
+- trains a small offline logistic-regression reranker from exported JSONL rows
+- defaults to `artifacts/ml/candidate-training.jsonl` as input
+- defaults to `artifacts/ml/reranker-baseline.json` as output
+- reports top-1 accuracy, top-3 recall, MRR, and heuristic baseline metrics
+- accepts `--dataset <path>`, `--out <path>`, `--iterations <number>`, and
+  `--learning-rate <number>`
 
 `deno task query <text>`
 
@@ -430,7 +440,7 @@ When you run `deno task ml:build-dataset`, the application:
 5. writes deterministic JSONL rows to the output path
 
 This is the first Phase 3 primitive. It prepares labeled data for a future
-candidate reranker, but it does not train or run a model yet.
+candidate reranker.
 
 ## ML Feature Flow
 
@@ -444,6 +454,22 @@ When you run `deno task ml:features --span <span-id>`, the application:
 The feature vector includes heuristic rank/confidence, title and overview
 overlap, exact title mentions, comparative-context flags, popularity, vote
 count, candidate-set size, and duplicate normalized-title counts.
+
+## ML Training Flow
+
+When you run `deno task ml:train`, the application:
+
+1. reads exported candidate training rows from JSONL
+2. uses `train` split rows when the dataset contains split metadata
+3. parses each row's versioned feature vector
+4. trains a dependency-free logistic-regression reranker
+5. writes a versioned model artifact with weights, normalization parameters,
+   feature order, and metrics
+
+The current trainer is intentionally small and offline. It validates the
+training/evaluation plumbing before any heavier ML dependency is introduced.
+With the current local data volume, metrics mostly prove the command path and
+artifact format rather than real model quality.
 
 ## Architecture
 
@@ -562,6 +588,7 @@ The test suite currently covers:
 - episode-level reporting
 - Phase 3 candidate training dataset export
 - Phase 3 candidate feature vector generation
+- Phase 3 baseline reranker training and metric calculation
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -576,6 +603,8 @@ The test suite currently covers:
   human review before labels are accepted.
 - Manual movie labels currently support one primary movie per span.
 - Phase 3 training data only includes spans with manual labels.
+- The baseline reranker is only as useful as the available manual labels; with a
+  tiny dataset, trainer metrics are not a trustworthy quality signal yet.
 - Query scoring is currently in-process over all embeddings, which is fine for
   small corpora but not intended as the final scaling strategy.
 
@@ -583,7 +612,7 @@ The test suite currently covers:
 
 - add richer candidate resolution heuristics for person names and one-word
   titles
-- add a baseline reranker trainer using the exported Phase 3 feature vectors
+- integrate the trained reranker into candidate resolution behind a fallback
 - move search candidates to a more scalable vector-aware backend when needed
 
 ## Notes
