@@ -18,6 +18,7 @@
     "resolve:episode": "deno run --allow-read --allow-write --allow-env --allow-net src/cli/resolveEpisode.ts",
     "v2:windows": "deno run --allow-read --allow-write --allow-env src/v2/cli/buildWindows.ts",
     "v2:infer": "deno run --allow-read --allow-write --allow-env --allow-net src/v2/cli/inferEpisode.ts",
+    "v2:canonicalize": "deno run --allow-read --allow-write --allow-env --allow-net src/v2/cli/canonicalizeEpisode.ts",
     "episode:report": "deno run --allow-read --allow-write --allow-env src/cli/episodeReport.ts",
     "ml:build-dataset": "deno run --allow-read --allow-write --allow-env src/cli/buildMlDataset.ts",
     "ml:features": "deno run --allow-read --allow-write --allow-env src/cli/inspectMlFeatures.ts",

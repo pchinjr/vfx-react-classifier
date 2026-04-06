@@ -256,6 +256,7 @@ deno task movies:search "Jurassic Park"
 deno task resolve:episode --episode ep_123 --force
 deno task v2:windows --episode ep_123 --force --inspect
 deno task v2:infer --episode ep_123 --force --limit 3 --inspect
+deno task v2:canonicalize --episode ep_123 --force --inspect
 deno task spans:candidates --span span_123
 deno task spans:label --span span_123 --candidate-rank 1
 deno task episode:report --episode ep_123
@@ -348,6 +349,17 @@ deno task fmt
 - accepts `--inspect` or `--list` to print persisted inferences after writing
 - accepts `--model <model>` and `--prompt-version <version>` for deliberate
   version comparisons
+
+`deno task v2:canonicalize --episode <episode-id>`
+
+- maps persisted V2 work inferences to canonical TMDb movie/TV records
+- uses the inferred media type as the catalog search hint
+- caches returned TMDb records in `movie_catalog`
+- writes the best accepted match to `v2_canonical_work_matches`
+- stores a separate match confidence so inference confidence and catalog
+  confidence can be inspected independently
+- accepts `--force` to replace canonical matches for the episode
+- accepts `--inspect` or `--list` to print canonical matches after writing
 
 `deno task spans:candidates --span <span-id>`
 
@@ -719,8 +731,15 @@ Inference uses a versioned prompt and structured JSON output to persist:
 - optional rationale
 - model and prompt versions
 
-This still does not canonicalize guesses to TMDb or aggregate neighboring
-windows. Those are separate milestones so V2 can be evaluated stage by stage.
+The third V2 slice canonicalizes inferred title guesses against TMDb. It reuses
+the V1 TMDb client and catalog cache, but the input is the semantic `titleGuess`
+plus model-inferred media type rather than a phrase extracted from
+capitalization rules. Canonical matches are persisted separately from raw
+inferences so weak matches can be inspected, replaced, or compared without
+destroying the original model output.
+
+V2 still does not aggregate neighboring windows. That is a separate milestone so
+window-level inference and catalog grounding can be evaluated independently.
 
 ## Architecture
 
@@ -865,6 +884,7 @@ The test suite currently covers:
   planning, and weak unknown-TV candidate filtering
 - V2 inference-window generation and persistence
 - V2 structured semantic work inference parsing and persistence
+- V2 canonicalization from semantic title guesses to TMDb catalog records
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -893,8 +913,9 @@ The test suite currently covers:
 - Unknown media-type TV lookup is intentionally conservative; medium-quality
   unknown queries only try TV as an empty-movie-results fallback, and
   low-quality unknown queries do not broaden to TV.
-- V2 currently builds inference windows and raw semantic work inferences;
-  canonicalization, aggregation, and review decisions are not implemented yet.
+- V2 currently builds inference windows, raw semantic work inferences, and
+  canonical TMDb matches; aggregation and review decisions are not implemented
+  yet.
 - Query scoring is currently in-process over all embeddings, which is fine for
   small corpora but not intended as the final scaling strategy.
 
@@ -905,7 +926,7 @@ The test suite currently covers:
   titles
 - add corpus-level fixtures for more weak unknown-TV false positives
 - add more manual labels and known-failure fixtures for episode 1 and episode 10
-- add V2 canonicalization from inferred title guesses to TMDb works
+- add V2 aggregation across neighboring windows with repeated canonical matches
 - move search candidates to a more scalable vector-aware backend when needed
 
 ## Notes

@@ -159,4 +159,17 @@ CREATE TABLE IF NOT EXISTS v2_work_inferences (
 
 CREATE INDEX IF NOT EXISTS idx_v2_work_inferences_window_id
   ON v2_work_inferences (window_id);
+
+CREATE TABLE IF NOT EXISTS v2_canonical_work_matches (
+  id TEXT PRIMARY KEY,
+  inference_id TEXT NOT NULL,
+  work_id TEXT NOT NULL,
+  match_confidence REAL NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (inference_id) REFERENCES v2_work_inferences(id) ON DELETE CASCADE,
+  FOREIGN KEY (work_id) REFERENCES movie_catalog(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_v2_canonical_work_matches_inference_id
+  ON v2_canonical_work_matches (inference_id);
 `
