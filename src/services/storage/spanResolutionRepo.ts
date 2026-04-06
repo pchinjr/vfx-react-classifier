@@ -112,7 +112,9 @@ export function getSpanMovieCandidates(
   const params = resolverVersion ? [spanId, resolverVersion] : [spanId]
   const resolverFilter = resolverVersion ? 'AND resolver_version = ?' : ''
 
-  return db.queryEntries<SpanMovieCandidate & { movieTitle: string }>(
+  return db.queryEntries<
+    SpanMovieCandidate & { movieTitle: string; movieMediaType: string }
+  >(
     `
     SELECT
       smc.id,
@@ -123,7 +125,8 @@ export function getSpanMovieCandidates(
       smc.resolver_version AS resolverVersion,
       smc.evidence_json AS evidenceJson,
       smc.created_at AS createdAt,
-      mc.title AS movieTitle
+      mc.title AS movieTitle,
+      mc.media_type AS movieMediaType
     FROM span_movie_candidates smc
     INNER JOIN movie_catalog mc ON mc.id = smc.movie_id
     WHERE smc.span_id = ?
@@ -145,7 +148,9 @@ export function getSpanMovieCandidateByRank(
     : [spanId, rank]
   const resolverFilter = resolverVersion ? 'AND resolver_version = ?' : ''
 
-  return db.queryEntries<SpanMovieCandidate & { movieTitle: string }>(
+  return db.queryEntries<
+    SpanMovieCandidate & { movieTitle: string; movieMediaType: string }
+  >(
     `
     SELECT
       smc.id,
@@ -156,7 +161,8 @@ export function getSpanMovieCandidateByRank(
       smc.resolver_version AS resolverVersion,
       smc.evidence_json AS evidenceJson,
       smc.created_at AS createdAt,
-      mc.title AS movieTitle
+      mc.title AS movieTitle,
+      mc.media_type AS movieMediaType
     FROM span_movie_candidates smc
     INNER JOIN movie_catalog mc ON mc.id = smc.movie_id
     WHERE smc.span_id = ?
@@ -198,7 +204,9 @@ export function upsertSpanMovieLabel(
 }
 
 export function getSpanMovieLabel(db: DatabaseClient, spanId: string) {
-  return db.queryEntries<SpanMovieLabel & { movieTitle: string }>(
+  return db.queryEntries<
+    SpanMovieLabel & { movieTitle: string; movieMediaType: string }
+  >(
     `
     SELECT
       sml.id,
@@ -207,7 +215,8 @@ export function getSpanMovieLabel(db: DatabaseClient, spanId: string) {
       sml.label_source AS labelSource,
       sml.confidence,
       sml.created_at AS createdAt,
-      mc.title AS movieTitle
+      mc.title AS movieTitle,
+      mc.media_type AS movieMediaType
     FROM span_movie_labels sml
     INNER JOIN movie_catalog mc ON mc.id = sml.movie_id
     WHERE sml.span_id = ?
@@ -299,6 +308,7 @@ export function getEpisodeSpanResolutionRows(
     labelSource?: string
     labelConfidence?: number
     topCandidateTitle?: string
+    topCandidateMediaType?: string
     topCandidateConfidence?: number
   }>(
     `
@@ -311,6 +321,7 @@ export function getEpisodeSpanResolutionRows(
       sml.label_source AS labelSource,
       sml.confidence AS labelConfidence,
       top_movie.title AS topCandidateTitle,
+      top_movie.media_type AS topCandidateMediaType,
       top_candidate.confidence AS topCandidateConfidence
     FROM discussion_spans ds
     LEFT JOIN span_movie_candidates smc ON
@@ -330,6 +341,7 @@ export function getEpisodeSpanResolutionRows(
       sml.label_source,
       sml.confidence,
       top_movie.title,
+      top_movie.media_type,
       top_candidate.confidence
     ORDER BY ds.start ASC
     `,

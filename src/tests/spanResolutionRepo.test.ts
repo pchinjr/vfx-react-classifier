@@ -43,6 +43,7 @@ function movie(): MovieCatalogRecord {
     id: 'movie_jurassic',
     source: 'tmdb',
     sourceMovieId: '329',
+    mediaType: 'movie',
     title: 'Jurassic Park',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',

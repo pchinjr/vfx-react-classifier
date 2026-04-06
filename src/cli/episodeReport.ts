@@ -82,9 +82,9 @@ try {
       })`
       : 'label=none'
     const topCandidate = row.topCandidateTitle
-      ? `top=${row.topCandidateTitle} (${
-        row.topCandidateConfidence?.toFixed(4) ?? '0.0000'
-      })`
+      ? `top=${row.topCandidateTitle} [${
+        row.topCandidateMediaType ?? 'movie'
+      }] (${row.topCandidateConfidence?.toFixed(4) ?? '0.0000'})`
       : 'top=none'
 
     console.log(

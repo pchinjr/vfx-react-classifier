@@ -27,6 +27,7 @@ function movie(
     id: 'movie_jurassic',
     source: 'tmdb',
     sourceMovieId: '329',
+    mediaType: 'movie',
     title: 'Jurassic Park',
     originalTitle: 'Jurassic Park',
     releaseDate: '1993-06-11',
@@ -100,18 +101,22 @@ Deno.test('resolveSpanMovieCandidates ranks candidates with evidence JSON', asyn
   ])
   assertEquals(result.candidates[0]?.movieId, 'movie_jurassic')
   assertEquals(result.candidates[0]?.rank, 1)
-  assertEquals(result.candidates[0]?.resolverVersion, 'span-movie-resolver-v2')
+  assertEquals(result.candidates[0]?.resolverVersion, 'span-movie-resolver-v3')
   assertEquals(JSON.parse(result.candidates[0]?.evidenceJson ?? '{}'), {
     searchQuery: 'Jurassic Park',
     matchedTitle: 'Jurassic Park',
     titleSimilarity: 1,
     overviewOverlap: 0.1667,
     releaseYearMentioned: 1993,
-    resolverVersion: 'span-movie-resolver-v2',
+    resolverVersion: 'span-movie-resolver-v3',
     querySource: 'precision',
     normalizedPhrase: 'jurassic park',
     lookupQuery: 'Jurassic Park',
     filterPassed: true,
+    mediaType: 'movie',
+    mediaTypeHint: 'unknown',
+    queryHygieneScore: 0.8,
+    queryHygieneReason: 'title_shaped_phrase',
   })
 })
 

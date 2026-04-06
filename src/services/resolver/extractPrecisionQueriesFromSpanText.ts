@@ -39,6 +39,7 @@ export function extractPrecisionQueriesFromSpanText(text: string) {
       source: 'precision',
       normalizedPhrase,
       confidenceHint: 1,
+      mediaTypeHint: 'unknown',
     })
   }
 

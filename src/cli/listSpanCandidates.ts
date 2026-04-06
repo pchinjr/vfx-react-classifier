@@ -8,7 +8,7 @@ import {
   resolveSpanMovieCandidates,
   SPAN_MOVIE_RESOLVER_VERSION,
 } from '../services/movies/resolveSpanMovies.ts'
-import { searchTmdbMovies } from '../services/movies/tmdbClient.ts'
+import { searchTmdbWorks } from '../services/movies/tmdbClient.ts'
 import { initializeDatabase, openDatabase } from '../services/storage/db.ts'
 import { upsertMovieCatalogRecords } from '../services/storage/movieCatalogRepo.ts'
 import {
@@ -72,9 +72,10 @@ try {
 
     const result = await resolveSpanMovieCandidates(span, {
       resolverVersion,
-      searchMovies: (query) =>
-        searchTmdbMovies(query, {
+      searchWorks: (query) =>
+        searchTmdbWorks(query.query, {
           apiKey: getEnv().tmdbApiKey,
+          mediaTypeHint: query.mediaTypeHint ?? 'unknown',
         }),
     })
     const candidates = model
@@ -109,7 +110,9 @@ try {
   } else {
     for (const candidate of candidates) {
       console.log(
-        `#${candidate.rank} | ${candidate.movieTitle} | confidence=${
+        `#${candidate.rank} | ${candidate.movieTitle} | ${
+          candidate.movieMediaType ?? 'movie'
+        } | confidence=${
           candidate.confidence.toFixed(4)
         } | ${candidate.resolverVersion}`,
       )
@@ -123,6 +126,10 @@ try {
         querySource?: string
         normalizedPhrase?: string
         lookupQuery?: string
+        mediaType?: string
+        mediaTypeHint?: string
+        queryHygieneScore?: number
+        queryHygieneReason?: string
         model?: { name?: string; version?: string; score?: number }
       }
       console.log(
@@ -138,6 +145,20 @@ try {
           `querySource: ${evidence.querySource}, normalizedPhrase=${
             evidence.normalizedPhrase ?? ''
           }, lookupQuery="${evidence.lookupQuery ?? ''}"`,
+        )
+      }
+      if (evidence.mediaType || evidence.mediaTypeHint) {
+        console.log(
+          `mediaType: ${evidence.mediaType ?? 'unknown'}, hint=${
+            evidence.mediaTypeHint ?? 'unknown'
+          }`,
+        )
+      }
+      if (typeof evidence.queryHygieneScore === 'number') {
+        console.log(
+          `queryHygiene: score=${evidence.queryHygieneScore}, reason=${
+            evidence.queryHygieneReason ?? ''
+          }`,
         )
       }
       if (evidence.model) {

@@ -13,6 +13,7 @@ function movie(id: string, title: string): MovieCatalogRecord {
     id,
     source: 'tmdb',
     sourceMovieId: id.replace('movie_', ''),
+    mediaType: 'movie',
     title,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',

@@ -15,11 +15,11 @@ Deno.test('extractPrecisionQueriesFromSpanText preserves clean title-like behavi
 Deno.test('buildResolverQueries uses fallback aliases only when precision is empty', () => {
   assertEquals(
     buildResolverQueries('game of thrones and sonic are both lowercase').map(
-      (query) => [query.query, query.source],
+      (query) => [query.query, query.source, query.mediaTypeHint],
     ),
     [
-      ['Game of Thrones', 'fallback_alias'],
-      ['Sonic the Hedgehog', 'fallback_alias'],
+      ['Game of Thrones', 'fallback_alias', 'tv'],
+      ['Sonic the Hedgehog', 'fallback_alias', 'movie'],
     ],
   )
 })

@@ -29,6 +29,7 @@ function movie(
     id,
     source: 'tmdb',
     sourceMovieId: id.replace('movie_', ''),
+    mediaType: 'movie',
     title,
     originalTitle: title,
     releaseYear,

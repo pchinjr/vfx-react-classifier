@@ -1,6 +1,20 @@
 import { MEDIA_ALIAS_HINTS } from './mediaAliasHints.ts'
-import type { ResolverQuery } from './queryTypes.ts'
+import type { ResolverQuery, ResolverQueryMediaTypeHint } from './queryTypes.ts'
 import { normalizeResolverText } from './text.ts'
+
+function resolverMediaTypeHint(
+  hint: string | undefined,
+): ResolverQueryMediaTypeHint | undefined {
+  if (hint === 'movie' || hint === 'tv') {
+    return hint
+  }
+
+  if (hint === 'franchise' || hint === 'character') {
+    return 'movie'
+  }
+
+  return undefined
+}
 
 export function expandAliasHintQueries(text: string) {
   const normalizedText = ` ${normalizeResolverText(text)} `
@@ -22,6 +36,7 @@ export function expandAliasHintQueries(text: string) {
         source: 'fallback_alias',
         normalizedPhrase,
         confidenceHint: 0.8 + (hint.confidenceBoost ?? 0),
+        mediaTypeHint: resolverMediaTypeHint(hint.mediaTypeHint),
       })
     }
   }

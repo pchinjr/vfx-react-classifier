@@ -32,6 +32,7 @@ function movie(overrides: Partial<MovieCatalogRecord>): MovieCatalogRecord {
     id: 'movie_mortal_kombat_1995',
     source: 'tmdb',
     sourceMovieId: '9312',
+    mediaType: 'movie',
     title: 'Mortal Kombat',
     originalTitle: 'Mortal Kombat',
     releaseYear: 1995,

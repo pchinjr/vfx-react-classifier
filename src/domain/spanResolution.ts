@@ -21,6 +21,10 @@ export type SpanMovieCandidateEvidence = {
   normalizedPhrase?: string
   lookupQuery?: string
   filterPassed?: boolean
+  mediaType?: string
+  mediaTypeHint?: string
+  queryHygieneScore?: number
+  queryHygieneReason?: string
 }
 
 export type SpanMovieCandidate = {

@@ -15,6 +15,7 @@ function movie(
     id: 'movie_one',
     source: 'tmdb',
     sourceMovieId: '329',
+    mediaType: 'movie',
     title: 'Jurassic Park',
     originalTitle: 'Jurassic Park',
     releaseDate: '1993-06-11',

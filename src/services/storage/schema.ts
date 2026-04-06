@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS movie_catalog (
   id TEXT PRIMARY KEY,
   source TEXT NOT NULL,
   source_movie_id TEXT NOT NULL,
+  media_type TEXT NOT NULL DEFAULT 'movie',
   title TEXT NOT NULL,
   original_title TEXT,
   release_date TEXT,
@@ -80,9 +81,6 @@ CREATE TABLE IF NOT EXISTS movie_catalog (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_movie_catalog_source_movie_id
-  ON movie_catalog (source, source_movie_id);
 
 CREATE TABLE IF NOT EXISTS span_resolution_runs (
   id TEXT PRIMARY KEY,

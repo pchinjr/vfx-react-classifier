@@ -10,7 +10,7 @@ import {
   resolveSpanMovieCandidates,
   SPAN_MOVIE_RESOLVER_VERSION,
 } from '../services/movies/resolveSpanMovies.ts'
-import { searchTmdbMovies } from '../services/movies/tmdbClient.ts'
+import { searchTmdbWorks } from '../services/movies/tmdbClient.ts'
 import { initializeDatabase, openDatabase } from '../services/storage/db.ts'
 import { getDiscussionSpansForEpisode } from '../services/storage/discussionSpansRepo.ts'
 import { upsertMovieCatalogRecords } from '../services/storage/movieCatalogRepo.ts'
@@ -81,9 +81,10 @@ try {
         resolverVersion,
         maxCandidates,
         maxQueries,
-        searchMovies: (query) =>
-          searchTmdbMovies(query, {
+        searchWorks: (query) =>
+          searchTmdbWorks(query.query, {
             apiKey: getEnv().tmdbApiKey,
+            mediaTypeHint: query.mediaTypeHint ?? 'unknown',
             limit: maxCandidates,
           }),
       })

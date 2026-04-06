@@ -7,18 +7,24 @@ import type {
 import { makeId } from '../../lib/ids.ts'
 import { nowIso } from '../../lib/time.ts'
 import { buildResolverQueries } from '../resolver/buildResolverQueries.ts'
+import { filterResolverQueriesForLookup } from '../resolver/filterResolverQueriesForLookup.ts'
 import type { ResolverQuery } from '../resolver/queryTypes.ts'
 import { normalizeResolverText } from '../resolver/text.ts'
 
-export const SPAN_MOVIE_RESOLVER_VERSION = 'span-movie-resolver-v2'
+export const SPAN_MOVIE_RESOLVER_VERSION = 'span-movie-resolver-v3'
 const MIN_TITLE_SIMILARITY = 0.6
 
 export type MovieSearchFn = (
   query: string,
 ) => Promise<MovieCatalogRecord[]> | MovieCatalogRecord[]
 
+export type WorkSearchFn = (
+  query: ResolverQuery,
+) => Promise<MovieCatalogRecord[]> | MovieCatalogRecord[]
+
 export type ResolveSpanMoviesOptions = {
-  searchMovies: MovieSearchFn
+  searchMovies?: MovieSearchFn
+  searchWorks?: WorkSearchFn
   resolverVersion?: string
   now?: string
   maxQueries?: number
@@ -114,6 +120,10 @@ function confidenceFor(
       normalizedPhrase: query.normalizedPhrase,
       lookupQuery: query.query,
       filterPassed: true,
+      mediaType: movie.mediaType,
+      mediaTypeHint: query.mediaTypeHint,
+      queryHygieneScore: query.hygieneScore,
+      queryHygieneReason: query.hygieneReason,
     },
   }
 }
@@ -140,12 +150,14 @@ export async function resolveSpanMovieCandidates(
   }
 
   const scoredByMovieId = new Map<string, ScoredCandidate>()
-  const queries = buildResolverQueries(span.text, {
-    maxQueries: options.maxQueries ?? 3,
-  })
+  const queries = filterResolverQueriesForLookup(
+    buildResolverQueries(span.text, {
+      maxQueries: options.maxQueries ?? 3,
+    }),
+  )
 
   for (const query of queries) {
-    const movies = await options.searchMovies(query.query)
+    const movies = await searchForQuery(options, query)
     for (const movie of movies) {
       const scored = confidenceFor(span, query, movie, resolverVersion)
       const existing = scoredByMovieId.get(movie.id)
@@ -184,4 +196,21 @@ export async function resolveSpanMovieCandidates(
       createdAt: now,
     })),
   }
+}
+
+async function searchForQuery(
+  options: ResolveSpanMoviesOptions,
+  query: ResolverQuery,
+) {
+  if (options.searchWorks) {
+    return await options.searchWorks(query)
+  }
+
+  if (options.searchMovies) {
+    return await options.searchMovies(query.query)
+  }
+
+  throw new Error(
+    'resolveSpanMovieCandidates requires searchWorks or searchMovies',
+  )
 }

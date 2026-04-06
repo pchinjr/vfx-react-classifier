@@ -12,11 +12,12 @@ export function upsertMovieCatalogRecords(
       db.query(
         `
         INSERT INTO movie_catalog (
-          id, source, source_movie_id, title, original_title, release_date,
-          release_year, overview, metadata_json, created_at, updated_at
+          id, source, source_movie_id, media_type, title, original_title,
+          release_date, release_year, overview, metadata_json, created_at,
+          updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(source, source_movie_id) DO UPDATE SET
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(source, media_type, source_movie_id) DO UPDATE SET
           title = excluded.title,
           original_title = excluded.original_title,
           release_date = excluded.release_date,
@@ -29,6 +30,7 @@ export function upsertMovieCatalogRecords(
           record.id,
           record.source,
           record.sourceMovieId,
+          record.mediaType,
           record.title,
           record.originalTitle ?? null,
           record.releaseDate ?? null,
@@ -52,6 +54,7 @@ export function getMovieCatalogRecord(
   db: DatabaseClient,
   source: MovieCatalogRecord['source'],
   sourceMovieId: string,
+  mediaType: MovieCatalogRecord['mediaType'] = 'movie',
 ) {
   const rows = db.queryEntries<MovieCatalogRecord>(
     `
@@ -59,6 +62,7 @@ export function getMovieCatalogRecord(
       id,
       source,
       source_movie_id AS sourceMovieId,
+      media_type AS mediaType,
       title,
       original_title AS originalTitle,
       release_date AS releaseDate,
@@ -68,10 +72,10 @@ export function getMovieCatalogRecord(
       created_at AS createdAt,
       updated_at AS updatedAt
     FROM movie_catalog
-    WHERE source = ? AND source_movie_id = ?
+    WHERE source = ? AND source_movie_id = ? AND media_type = ?
     LIMIT 1
     `,
-    [source, sourceMovieId],
+    [source, sourceMovieId, mediaType],
   )
 
   return rows[0] ?? null
@@ -89,6 +93,7 @@ export function searchCachedMovieCatalogRecords(
       id,
       source,
       source_movie_id AS sourceMovieId,
+      media_type AS mediaType,
       title,
       original_title AS originalTitle,
       release_date AS releaseDate,

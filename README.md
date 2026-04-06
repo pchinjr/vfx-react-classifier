@@ -142,9 +142,32 @@ Challenge: TMDb movie search is not the same as general media search.
 movie-adjacent records rather than the canonical TV series.
 
 Solution: preserve evidence fields including `querySource`, `normalizedPhrase`,
-and `lookupQuery`, so weak alias outcomes are visible in review. The next
-catalog expansion should add TV search or media-type-aware lookup rather than
-forcing TV references through movie search.
+and `lookupQuery`, so weak alias outcomes are visible in review. Phase 5 starts
+the catalog expansion by adding media-type-aware lookup and pre-lookup query
+hygiene.
+
+### Phase 5: Media-Type-Aware Catalog Hygiene
+
+Extended the catalog layer toward work-based resolution without renaming the
+movie tables yet. `movie_catalog` now stores a `media_type` column and enforces
+TMDb identity by `(source, media_type, source_movie_id)`, which lets movie and
+TV IDs coexist safely while existing movie records remain valid.
+
+Challenge: alias hints already knew that `game of thrones` is TV, but the
+resolver dropped that hint and always queried TMDb movie search.
+
+Solution: resolver queries now carry `mediaTypeHint`, alias expansion preserves
+TV/movie intent, and live episode resolution calls a unified TMDb work search.
+Movie hints search the movie endpoint, TV hints search the TV endpoint, and
+unknown hints can search both.
+
+Challenge: the full 9-episode run showed that some precision phrases, such as
+`Will Smith Budapest` and `Stick Around`, still leaked into TMDb and polluted
+the local cache.
+
+Solution: added a pre-lookup query-hygiene pass. Alias-backed queries are kept,
+known noisy precision phrases are blocked before TMDb calls, and kept candidates
+store hygiene evidence such as `queryHygieneScore` and `queryHygieneReason`.
 
 ## Requirements
 
@@ -737,7 +760,7 @@ The test suite currently covers:
 - integration-style search over fixture transcript data
 - English-only `yt-dlp` caption argument selection
 - deterministic discussion span generation and repository reruns
-- TMDb movie search mapping and movie catalog cache upserts
+- TMDb movie and TV search mapping plus catalog cache upserts
 - span movie candidate ranking and resolution run persistence
 - manual span label confirmation and rerun preservation
 - episode-level reporting
@@ -748,6 +771,8 @@ The test suite currently covers:
 - Phase 3 evaluation filtering and baseline metric comparison
 - Phase 4 query extraction stages, alias fallback, filtering, and episode 1
   regressions
+- Phase 5 media-type hint propagation, TMDb work search routing, and pre-lookup
+  query hygiene
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -769,16 +794,18 @@ The test suite currently covers:
   non-default candidate set.
 - Lowercase fallback currently uses a small explicit alias set rather than broad
   fuzzy phrase extraction.
-- TMDb lookup currently uses movie search only, so TV references such as
-  `Game of Thrones` can produce weak movie-adjacent candidates.
+- The catalog tables are still named `movie_*` for compatibility, even though
+  records now carry `media_type` and can represent TV works.
+- Query hygiene is intentionally conservative and denylist-backed; it blocks
+  known noisy precision phrases but is not a general title-quality model.
 - Query scoring is currently in-process over all embeddings, which is fine for
   small corpora but not intended as the final scaling strategy.
 
 ## Suggested Next Steps
 
+- finish the work-catalog rename when the schema is ready for a larger migration
 - add richer candidate resolution heuristics for person names and one-word
   titles
-- add media-type-aware TMDb lookup for TV references such as `Game of Thrones`
 - add more manual labels and known-failure fixtures for episode 1 and episode 10
 - move search candidates to a more scalable vector-aware backend when needed
 
