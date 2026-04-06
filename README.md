@@ -259,6 +259,7 @@ deno task v2:infer --episode ep_123 --force --limit 3 --inspect
 deno task v2:canonicalize --episode ep_123 --force --inspect
 deno task v2:aggregate --episode ep_123
 deno task v2:report --episode ep_123
+deno task v2:review --episode ep_123
 deno task spans:candidates --span span_123
 deno task spans:label --span span_123 --candidate-rank 1
 deno task episode:report --episode ep_123
@@ -377,6 +378,15 @@ deno task fmt
   discussions
 - prints each aggregated discussion with timestamp, canonical title, media type,
   role, and confidence
+
+`deno task v2:review --episode <episode-id>`
+
+- prints aggregated discussions and raw inferences with pending or recorded
+  review status
+- records reviewer decisions with `--target-type inference|discussion`,
+  `--target-id <id>`, and `--decision confirmed|corrected|rejected`
+- requires `--work-id <catalog-work-id>` for corrected decisions
+- accepts `--notes <text>` for reviewer context
 
 `deno task spans:candidates --span <span-id>`
 
@@ -764,6 +774,12 @@ role, which produces the first V2 discussion-region output. This replaces the V1
 phrase-first span as the eventual review target while keeping the raw inference
 and canonicalization layers available for debugging.
 
+The fifth V2 slice adds review decisions over V2 entities. Review records attach
+to either raw inferences or aggregated discussions and can mark them confirmed,
+corrected, or rejected. This keeps V2 review provenance separate from V1 manual
+span labels while preserving the same source-of-truth habit: model output is
+only training-quality data after a human decision.
+
 ## Architecture
 
 ```text
@@ -909,6 +925,7 @@ The test suite currently covers:
 - V2 structured semantic work inference parsing and persistence
 - V2 canonicalization from semantic title guesses to TMDb catalog records
 - V2 aggregation and episode-level reporting over canonical matches
+- V2 review-decision persistence for confirmed, corrected, and rejected outputs
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -938,8 +955,8 @@ The test suite currently covers:
   unknown queries only try TV as an empty-movie-results fallback, and
   low-quality unknown queries do not broaden to TV.
 - V2 currently builds inference windows, raw semantic work inferences, canonical
-  TMDb matches, and aggregated discussion regions; review decisions and
-  evaluation are not implemented yet.
+  TMDb matches, aggregated discussion regions, and review decisions; evaluation
+  is not implemented yet.
 - Query scoring is currently in-process over all embeddings, which is fine for
   small corpora but not intended as the final scaling strategy.
 
@@ -950,7 +967,8 @@ The test suite currently covers:
   titles
 - add corpus-level fixtures for more weak unknown-TV false positives
 - add more manual labels and known-failure fixtures for episode 1 and episode 10
-- add V2 review decisions for confirmed, corrected, and rejected outputs
+- add a V2 evaluation harness that compares reviewed outputs against V1 and
+  selected corpus fixtures
 - move search candidates to a more scalable vector-aware backend when needed
 
 ## Notes

@@ -189,4 +189,18 @@ CREATE TABLE IF NOT EXISTS v2_aggregated_discussions (
 
 CREATE INDEX IF NOT EXISTS idx_v2_aggregated_discussions_episode_id
   ON v2_aggregated_discussions (episode_id);
+
+CREATE TABLE IF NOT EXISTS v2_review_decisions (
+  id TEXT PRIMARY KEY,
+  target_type TEXT NOT NULL,
+  target_id TEXT NOT NULL,
+  decision TEXT NOT NULL,
+  work_id TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (work_id) REFERENCES movie_catalog(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_v2_review_decisions_target
+  ON v2_review_decisions (target_type, target_id);
 `
