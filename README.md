@@ -260,6 +260,7 @@ deno task v2:canonicalize --episode ep_123 --force --inspect
 deno task v2:aggregate --episode ep_123
 deno task v2:report --episode ep_123
 deno task v2:review --episode ep_123
+deno task v2:evaluate --episode ep_123
 deno task spans:candidates --span span_123
 deno task spans:label --span span_123 --candidate-rank 1
 deno task episode:report --episode ep_123
@@ -387,6 +388,14 @@ deno task fmt
   `--target-id <id>`, and `--decision confirmed|corrected|rejected`
 - requires `--work-id <catalog-work-id>` for corrected decisions
 - accepts `--notes <text>` for reviewer context
+
+`deno task v2:evaluate --episode <episode-id>`
+
+- summarizes V2 review coverage for one episode
+- reports raw inference count, aggregated discussion count, reviewed target
+  counts, and confirmed/corrected/rejected decision totals
+- intentionally starts with review coverage rather than an accuracy score, since
+  V2 accuracy should only be calculated from reviewed source-of-truth decisions
 
 `deno task spans:candidates --span <span-id>`
 
@@ -780,6 +789,11 @@ corrected, or rejected. This keeps V2 review provenance separate from V1 manual
 span labels while preserving the same source-of-truth habit: model output is
 only training-quality data after a human decision.
 
+The sixth V2 slice adds the first evaluation harness. It reports per-episode V2
+review coverage and decision totals before claiming accuracy. This makes the
+evaluation path honest while the reviewed V2 dataset is still small, and gives a
+stable place to add corpus fixtures and V1-vs-V2 comparisons later.
+
 ## Architecture
 
 ```text
@@ -926,6 +940,7 @@ The test suite currently covers:
 - V2 canonicalization from semantic title guesses to TMDb catalog records
 - V2 aggregation and episode-level reporting over canonical matches
 - V2 review-decision persistence for confirmed, corrected, and rejected outputs
+- V2 review-coverage evaluation summaries
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -955,8 +970,9 @@ The test suite currently covers:
   unknown queries only try TV as an empty-movie-results fallback, and
   low-quality unknown queries do not broaden to TV.
 - V2 currently builds inference windows, raw semantic work inferences, canonical
-  TMDb matches, aggregated discussion regions, and review decisions; evaluation
-  is not implemented yet.
+  TMDb matches, aggregated discussion regions, review decisions, and
+  review-coverage summaries; corpus-level accuracy evaluation is not implemented
+  yet.
 - Query scoring is currently in-process over all embeddings, which is fine for
   small corpora but not intended as the final scaling strategy.
 
@@ -967,8 +983,8 @@ The test suite currently covers:
   titles
 - add corpus-level fixtures for more weak unknown-TV false positives
 - add more manual labels and known-failure fixtures for episode 1 and episode 10
-- add a V2 evaluation harness that compares reviewed outputs against V1 and
-  selected corpus fixtures
+- add corpus-level V2 evaluation fixtures that compare reviewed outputs against
+  V1 on selected episodes
 - move search candidates to a more scalable vector-aware backend when needed
 
 ## Notes
