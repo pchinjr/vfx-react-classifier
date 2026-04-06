@@ -85,6 +85,7 @@ try {
           searchTmdbWorks(query.query, {
             apiKey: getEnv().tmdbApiKey,
             mediaTypeHint: query.mediaTypeHint ?? 'unknown',
+            queryQualityTier: query.qualityTier,
             limit: maxCandidates,
           }),
       })

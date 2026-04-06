@@ -1,4 +1,5 @@
 import type { ResolverQuery } from './queryTypes.ts'
+import { classifyResolverQueryQuality } from './classifyResolverQueryQuality.ts'
 import { normalizeResolverText, resolverTokens } from './text.ts'
 
 const BLOCKED_PRECISION_QUERIES = new Set([
@@ -23,7 +24,21 @@ const PERSON_CONTEXT_TOKENS = new Set([
 export type ResolverQueryQuality = {
   keep: boolean
   score: number
+  tier: 'high' | 'medium' | 'low'
   reason: string
+}
+
+function result(
+  keep: boolean,
+  score: number,
+  reason: string,
+): ResolverQueryQuality {
+  return {
+    keep,
+    score,
+    tier: classifyResolverQueryQuality(score),
+    reason,
+  }
 }
 
 function hasPersonLocationShape(tokens: string[]) {
@@ -43,40 +58,20 @@ export function scoreResolverQueryQuality(
   const tokens = resolverTokens(query.query)
 
   if (query.source === 'fallback_alias') {
-    return {
-      keep: true,
-      score: 1,
-      reason: 'alias_backed',
-    }
+    return result(true, 1, 'alias_backed')
   }
 
   if (BLOCKED_PRECISION_QUERIES.has(normalizedPhrase)) {
-    return {
-      keep: false,
-      score: 0,
-      reason: 'blocked_known_noisy_precision_query',
-    }
+    return result(false, 0, 'blocked_known_noisy_precision_query')
   }
 
   if (query.source === 'precision' && hasPersonLocationShape(tokens)) {
-    return {
-      keep: false,
-      score: 0.1,
-      reason: 'person_location_context_phrase',
-    }
+    return result(false, 0.1, 'person_location_context_phrase')
   }
 
   if (tokens.length >= 2) {
-    return {
-      keep: true,
-      score: 0.8,
-      reason: 'title_shaped_phrase',
-    }
+    return result(true, 0.8, 'title_shaped_phrase')
   }
 
-  return {
-    keep: false,
-    score: 0.2,
-    reason: 'low_information_query',
-  }
+  return result(false, 0.2, 'low_information_query')
 }

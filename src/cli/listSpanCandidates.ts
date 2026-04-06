@@ -76,6 +76,7 @@ try {
         searchTmdbWorks(query.query, {
           apiKey: getEnv().tmdbApiKey,
           mediaTypeHint: query.mediaTypeHint ?? 'unknown',
+          queryQualityTier: query.qualityTier,
         }),
     })
     const candidates = model
@@ -128,8 +129,11 @@ try {
         lookupQuery?: string
         mediaType?: string
         mediaTypeHint?: string
+        queryQualityTier?: string
         queryHygieneScore?: number
         queryHygieneReason?: string
+        catalogSearchPlan?: string
+        tvSearchAllowed?: boolean
         model?: { name?: string; version?: string; score?: number }
       }
       console.log(
@@ -156,8 +160,17 @@ try {
       }
       if (typeof evidence.queryHygieneScore === 'number') {
         console.log(
-          `queryHygiene: score=${evidence.queryHygieneScore}, reason=${
+          `queryHygiene: tier=${
+            evidence.queryQualityTier ?? 'unknown'
+          }, score=${evidence.queryHygieneScore}, reason=${
             evidence.queryHygieneReason ?? ''
+          }`,
+        )
+      }
+      if (evidence.catalogSearchPlan) {
+        console.log(
+          `catalogSearchPlan: ${evidence.catalogSearchPlan}, tvSearchAllowed=${
+            evidence.tvSearchAllowed ?? false
           }`,
         )
       }

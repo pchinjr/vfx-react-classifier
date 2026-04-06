@@ -159,7 +159,7 @@ resolver dropped that hint and always queried TMDb movie search.
 Solution: resolver queries now carry `mediaTypeHint`, alias expansion preserves
 TV/movie intent, and live episode resolution calls a unified TMDb work search.
 Movie hints search the movie endpoint, TV hints search the TV endpoint, and
-unknown hints can search both.
+unknown hints choose a conservative plan from the query quality tier.
 
 Challenge: the full 9-episode run showed that some precision phrases, such as
 `Will Smith Budapest` and `Stick Around`, still leaked into TMDb and polluted
@@ -176,11 +176,17 @@ and 3 TV. The known episode 1 `Game of Thrones` span now resolves to a TV
 candidate, and the episode 2 `Will Smith` / `Budapest` noise no longer persists
 as a v3 candidate.
 
-New caveat: unknown media-type queries can now search both movie and TV, which
-improves recall but can introduce weak TV matches. The first full rerun exposed
-examples such as `VFX Artists React` and `Newton's Cradle` as TV candidates in
-episode 3, so unknown-query TV routing needs an additional quality gate or more
-conservative search policy.
+Follow-up: unknown media-type queries now get deterministic `high`, `medium`, or
+`low` quality tiers before catalog lookup. High-quality unknown queries can
+search both movie and TV, medium-quality unknown queries search movie first and
+only fall back to TV when movie results are empty, and low-quality unknown
+queries stay movie-only. The chosen search plan is stored in candidate evidence
+as `catalogSearchPlan`, alongside `queryQualityTier` and `tvSearchAllowed`.
+
+Candidate persistence now has a named pre-persistence quality gate. Weak
+cross-media TV candidates from unknown queries are dropped before
+`span_movie_candidates` is written unless they have stronger title agreement and
+confidence, while explicit TV hints such as `Game of Thrones` are preserved.
 
 ## Requirements
 
@@ -545,10 +551,11 @@ application:
 1. creates a `span_resolution_runs` row with resolver version and status
 2. loads stored discussion spans for the episode
 3. extracts title-like search queries from each eligible span
-4. searches TMDb for each query
+4. assigns query quality tiers and a media-type-aware TMDb search plan
 5. caches returned movies in `movie_catalog`
 6. ranks candidates with transparent confidence and evidence JSON
-7. upserts `span_movie_candidates` by span, movie, and resolver version
+7. filters weak candidates before persistence
+8. upserts `span_movie_candidates` by span, movie, and resolver version
 
 This is a pragmatic first resolver, not a classifier. It is intentionally
 weighted and inspectable so bad matches can be debugged before manual labeling
@@ -674,6 +681,7 @@ src/
     embeddings/
     storage/
     search/
+    catalog/
   cli/
   lib/
   tests/
@@ -709,6 +717,10 @@ scripts/
 `src/services/search`
 
 - cosine similarity and retrieval ranking
+
+`src/services/catalog`
+
+- media-type-aware catalog search planning
 
 `src/cli`
 
@@ -786,6 +798,8 @@ The test suite currently covers:
   regressions
 - Phase 5 media-type hint propagation, TMDb work search routing, and pre-lookup
   query hygiene
+- Phase 5.1 resolver query quality tiers, conservative unknown-type search
+  planning, and weak unknown-TV candidate filtering
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -811,9 +825,9 @@ The test suite currently covers:
   records now carry `media_type` and can represent TV works.
 - Query hygiene is intentionally conservative and denylist-backed; it blocks
   known noisy precision phrases but is not a general title-quality model.
-- Unknown media-type queries may search both movie and TV; this recovered TV
-  references but also introduced some weak TV candidates that need a stricter
-  routing or ranking gate.
+- Unknown media-type TV lookup is intentionally conservative; medium-quality
+  unknown queries only try TV as an empty-movie-results fallback, and
+  low-quality unknown queries do not broaden to TV.
 - Query scoring is currently in-process over all embeddings, which is fine for
   small corpora but not intended as the final scaling strategy.
 
@@ -822,7 +836,7 @@ The test suite currently covers:
 - finish the work-catalog rename when the schema is ready for a larger migration
 - add richer candidate resolution heuristics for person names and one-word
   titles
-- add a stricter quality gate for unknown media-type TV searches
+- add corpus-level fixtures for more weak unknown-TV false positives
 - add more manual labels and known-failure fixtures for episode 1 and episode 10
 - move search candidates to a more scalable vector-aware backend when needed
 

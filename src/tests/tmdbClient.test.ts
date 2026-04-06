@@ -125,6 +125,7 @@ Deno.test('searchTmdbWorks routes by media-type hint', async () => {
     apiKey: 'test-key',
     fetcher,
     mediaTypeHint: 'unknown',
+    queryQualityTier: 'high',
   })
 
   assertEquals(requestedPaths, [
@@ -133,6 +134,63 @@ Deno.test('searchTmdbWorks routes by media-type hint', async () => {
     '/3/search/movie',
     '/3/search/tv',
   ])
+})
+
+Deno.test('searchTmdbWorks skips TV for low-quality unknown queries', async () => {
+  const requestedPaths: string[] = []
+  const fetcher: typeof fetch = (input) => {
+    requestedPaths.push(new URL(String(input)).pathname)
+    return Promise.resolve(new Response(JSON.stringify({ results: [] })))
+  }
+
+  await searchTmdbWorks('Newton Cradle', {
+    apiKey: 'test-key',
+    fetcher,
+    mediaTypeHint: 'unknown',
+    queryQualityTier: 'low',
+  })
+
+  assertEquals(requestedPaths, ['/3/search/movie'])
+})
+
+Deno.test('searchTmdbWorks searches TV fallback for medium-quality unknown queries only when movie results are empty', async () => {
+  const emptyMoviePaths: string[] = []
+  const emptyMovieFetcher: typeof fetch = (input) => {
+    emptyMoviePaths.push(new URL(String(input)).pathname)
+    return Promise.resolve(new Response(JSON.stringify({ results: [] })))
+  }
+
+  await searchTmdbWorks('Newton Cradle', {
+    apiKey: 'test-key',
+    fetcher: emptyMovieFetcher,
+    mediaTypeHint: 'unknown',
+    queryQualityTier: 'medium',
+  })
+
+  const movieHitPaths: string[] = []
+  const movieHitFetcher: typeof fetch = (input) => {
+    const path = new URL(String(input)).pathname
+    movieHitPaths.push(path)
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({
+          results: path === '/3/search/movie'
+            ? [{ id: 1, title: 'Newton Cradle' }]
+            : [],
+        }),
+      ),
+    )
+  }
+
+  await searchTmdbWorks('Newton Cradle', {
+    apiKey: 'test-key',
+    fetcher: movieHitFetcher,
+    mediaTypeHint: 'unknown',
+    queryQualityTier: 'medium',
+  })
+
+  assertEquals(emptyMoviePaths, ['/3/search/movie', '/3/search/tv'])
+  assertEquals(movieHitPaths, ['/3/search/movie'])
 })
 
 Deno.test('searchTmdbMovies surfaces non-OK API responses', async () => {

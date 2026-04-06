@@ -4,6 +4,7 @@ export type ResolverQuerySource =
   | 'fallback_phrase'
 
 export type ResolverQueryMediaTypeHint = 'movie' | 'tv' | 'unknown'
+export type ResolverQueryQualityTier = 'high' | 'medium' | 'low'
 
 export type ResolverQuery = {
   query: string
@@ -11,6 +12,7 @@ export type ResolverQuery = {
   normalizedPhrase?: string
   confidenceHint?: number
   mediaTypeHint?: ResolverQueryMediaTypeHint
+  qualityTier?: ResolverQueryQualityTier
   hygieneScore?: number
   hygieneReason?: string
 }

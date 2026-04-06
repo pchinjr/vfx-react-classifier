@@ -115,9 +115,66 @@ Deno.test('resolveSpanMovieCandidates ranks candidates with evidence JSON', asyn
     filterPassed: true,
     mediaType: 'movie',
     mediaTypeHint: 'unknown',
+    queryQualityTier: 'medium',
     queryHygieneScore: 0.8,
     queryHygieneReason: 'title_shaped_phrase',
+    catalogSearchPlan: 'movie-first-tv-fallback',
+    tvSearchAllowed: true,
   })
+})
+
+Deno.test('resolveSpanMovieCandidates includes explicit TV routing evidence', async () => {
+  const result = await resolveSpanMovieCandidates(
+    span(
+      'game of thrones has a strong television reference in this lowercase fallback discussion with enough context.',
+    ),
+    {
+      now: '2026-01-01T00:00:00.000Z',
+      searchWorks: (query) => {
+        assertEquals(query.query, 'Game of Thrones')
+        assertEquals(query.mediaTypeHint, 'tv')
+        assertEquals(query.qualityTier, 'high')
+        return [
+          movie({
+            id: 'tv_game_of_thrones',
+            sourceMovieId: '1399',
+            mediaType: 'tv',
+            title: 'Game of Thrones',
+            originalTitle: 'Game of Thrones',
+            releaseDate: '2011-04-17',
+            releaseYear: 2011,
+          }),
+        ]
+      },
+    },
+  )
+
+  const evidence = JSON.parse(result.candidates[0]?.evidenceJson ?? '{}')
+  assertEquals(result.movies[0]?.mediaType, 'tv')
+  assertEquals(evidence.catalogSearchPlan, 'tv-first')
+  assertEquals(evidence.tvSearchAllowed, true)
+})
+
+Deno.test('resolveSpanMovieCandidates filters weak unknown TV candidates before persistence', async () => {
+  const result = await resolveSpanMovieCandidates(
+    span(
+      'Newton Cradle is mentioned as a loose visual reference, but it is not enough evidence for a broad TV match.',
+    ),
+    {
+      searchWorks: () => [
+        movie({
+          id: 'tv_newton_cradle',
+          sourceMovieId: '999',
+          mediaType: 'tv',
+          title: 'Newton Cradle',
+          originalTitle: 'Newton Cradle',
+        }),
+      ],
+    },
+  )
+
+  assertEquals(result.movies, [])
+  assertEquals(result.candidates, [])
 })
 
 Deno.test('resolveSpanMovieCandidates rejects weak title matches', async () => {
