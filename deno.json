@@ -12,6 +12,8 @@
     "ingest:batch": "deno run --allow-read --allow-write --allow-env --allow-run --allow-net src/cli/ingest.ts --batch",
     "spans:build": "deno run --allow-read --allow-write --allow-env src/cli/buildSpans.ts",
     "spans:list": "deno run --allow-read --allow-write --allow-env src/cli/listSpans.ts",
+    "spans:candidates": "deno run --allow-read --allow-write --allow-env --allow-net src/cli/listSpanCandidates.ts",
+    "spans:label": "deno run --allow-read --allow-write --allow-env src/cli/labelSpan.ts",
     "movies:search": "deno run --allow-read --allow-write --allow-env --allow-net src/cli/searchMovies.ts",
     "resolve:episode": "deno run --allow-read --allow-write --allow-env --allow-net src/cli/resolveEpisode.ts",
     "query": "deno run --allow-read --allow-write --allow-env --allow-net src/cli/query.ts",

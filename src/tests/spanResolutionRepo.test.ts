@@ -2,7 +2,10 @@ import { assertEquals } from '@std/assert'
 
 import type { DiscussionSpan } from '../domain/discussionSpan.ts'
 import type { MovieCatalogRecord } from '../domain/movieCatalog.ts'
-import type { SpanMovieCandidate } from '../domain/spanResolution.ts'
+import type {
+  SpanMovieCandidate,
+  SpanMovieLabel,
+} from '../domain/spanResolution.ts'
 import { nowIso } from '../lib/time.ts'
 import { upsertDiscussionSpans } from '../services/storage/discussionSpansRepo.ts'
 import { upsertEpisode } from '../services/storage/episodesRepo.ts'
@@ -12,8 +15,11 @@ import {
   countSpanMovieCandidatesForEpisode,
   createSpanResolutionRun,
   deleteSpanMovieCandidatesForEpisode,
+  getSpanMovieCandidateByRank,
   getSpanMovieCandidates,
+  getSpanMovieLabel,
   upsertSpanMovieCandidates,
+  upsertSpanMovieLabel,
 } from '../services/storage/spanResolutionRepo.ts'
 import { createTestDatabase } from '../services/storage/testDb.ts'
 
@@ -51,6 +57,18 @@ function candidate(
     confidence: 0.9,
     resolverVersion: 'span-movie-resolver-v1',
     evidenceJson: '{}',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+function label(overrides: Partial<SpanMovieLabel> = {}): SpanMovieLabel {
+  return {
+    id: 'label_one',
+    spanId: 'span_one',
+    movieId: 'movie_jurassic',
+    labelSource: 'manual',
+    confidence: 0.9,
     createdAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   }
@@ -117,6 +135,49 @@ Deno.test('upsertSpanMovieCandidates is safe across resolver reruns', () => {
   }
 })
 
+Deno.test('getSpanMovieCandidateByRank finds the selected candidate', () => {
+  const { db } = createTestDatabase('span-resolution-candidate-by-rank')
+
+  try {
+    seed(db)
+    upsertSpanMovieCandidates(db, [
+      candidate({ id: 'cand_two', rank: 2, confidence: 0.7 }),
+      candidate({ rank: 1, confidence: 0.9 }),
+    ])
+
+    const selected = getSpanMovieCandidateByRank(
+      db,
+      'span_one',
+      1,
+      'span-movie-resolver-v1',
+    )
+    assertEquals(selected?.movieTitle, 'Jurassic Park')
+    assertEquals(selected?.rank, 1)
+  } finally {
+    db.close()
+  }
+})
+
+Deno.test('upsertSpanMovieLabel keeps one confirmed label per span', () => {
+  const { db } = createTestDatabase('span-resolution-label')
+
+  try {
+    seed(db)
+    upsertSpanMovieLabel(db, label())
+    upsertSpanMovieLabel(
+      db,
+      label({ confidence: 0.8, createdAt: '2026-01-01T00:01:00.000Z' }),
+    )
+
+    const confirmed = getSpanMovieLabel(db, 'span_one')
+    assertEquals(confirmed?.movieTitle, 'Jurassic Park')
+    assertEquals(confirmed?.confidence, 0.8)
+    assertEquals(confirmed?.labelSource, 'manual')
+  } finally {
+    db.close()
+  }
+})
+
 Deno.test('deleteSpanMovieCandidatesForEpisode clears one resolver version', () => {
   const { db } = createTestDatabase('span-resolution-delete-candidates')
 
@@ -139,6 +200,27 @@ Deno.test('deleteSpanMovieCandidatesForEpisode clears one resolver version', () 
     const remaining = getSpanMovieCandidates(db, 'span_one')
     assertEquals(remaining.length, 1)
     assertEquals(remaining[0]?.resolverVersion, 'span-movie-resolver-v2')
+  } finally {
+    db.close()
+  }
+})
+
+Deno.test('deleteSpanMovieCandidatesForEpisode preserves manual labels', () => {
+  const { db } = createTestDatabase('span-resolution-delete-preserves-label')
+
+  try {
+    seed(db)
+    upsertSpanMovieCandidates(db, [candidate()])
+    upsertSpanMovieLabel(db, label())
+
+    deleteSpanMovieCandidatesForEpisode(
+      db,
+      'ep_one',
+      'span-movie-resolver-v1',
+    )
+
+    assertEquals(getSpanMovieCandidates(db, 'span_one'), [])
+    assertEquals(getSpanMovieLabel(db, 'span_one')?.movieTitle, 'Jurassic Park')
   } finally {
     db.close()
   }

@@ -116,4 +116,18 @@ CREATE INDEX IF NOT EXISTS idx_span_movie_candidates_span_id
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_span_movie_candidates_span_movie_resolver
   ON span_movie_candidates (span_id, movie_id, resolver_version);
+
+CREATE TABLE IF NOT EXISTS span_movie_labels (
+  id TEXT PRIMARY KEY,
+  span_id TEXT NOT NULL,
+  movie_id TEXT NOT NULL,
+  label_source TEXT NOT NULL,
+  confidence REAL NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (span_id) REFERENCES discussion_spans(id) ON DELETE CASCADE,
+  FOREIGN KEY (movie_id) REFERENCES movie_catalog(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_span_movie_labels_span_id
+  ON span_movie_labels (span_id);
 `

@@ -28,3 +28,14 @@ export type SpanMovieCandidate = {
   evidenceJson: string
   createdAt: string
 }
+
+export type SpanMovieLabelSource = 'manual' | 'auto'
+
+export type SpanMovieLabel = {
+  id: string
+  spanId: string
+  movieId: string
+  labelSource: SpanMovieLabelSource
+  confidence: number
+  createdAt: string
+}

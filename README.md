@@ -112,6 +112,8 @@ deno task spans:build --episode ep_123
 deno task spans:list --episode ep_123
 deno task movies:search "Jurassic Park"
 deno task resolve:episode --episode ep_123 --force
+deno task spans:candidates --span span_123
+deno task spans:label --span span_123 --candidate-rank 1
 deno task query "Jurassic Park T-Rex"
 deno task reembed
 deno task db:init
@@ -173,6 +175,19 @@ deno task fmt
 - accepts `--force` to replace existing candidates for the current resolver
   version before rerunning
 
+`deno task spans:candidates --span <span-id>`
+
+- prints ranked movie candidates for one discussion span
+- includes confidence, resolver version, and evidence JSON highlights
+- accepts `--refresh` to rerun candidate resolution for that span before
+  printing
+
+`deno task spans:label --span <span-id> --candidate-rank <rank>`
+
+- confirms one ranked candidate as the current manual label for a span
+- stores the label in `span_movie_labels`
+- upserts by span ID so changing a manual label is deliberate and idempotent
+
 `deno task query <text>`
 
 - embeds the query text
@@ -215,6 +230,16 @@ movie-aware resolution.
 Represents one canonical movie record cached from TMDb. The local ID is stable,
 while `source` and `sourceMovieId` keep the external catalog identity explicit.
 
+### SpanMovieCandidate
+
+Represents one ranked movie candidate for a discussion span. Candidates are
+resolver output and can be safely replaced with `resolve:episode --force`.
+
+### SpanMovieLabel
+
+Represents one confirmed movie association for a discussion span. Labels are
+stored separately from candidates so resolver reruns do not erase manual review.
+
 ### SegmentEmbedding
 
 Represents one embedding vector for one segment for one embedding model.
@@ -237,6 +262,7 @@ Tables:
 - `movie_catalog`
 - `span_resolution_runs`
 - `span_movie_candidates`
+- `span_movie_labels`
 
 Embeddings are stored as JSON for v1 simplicity. The repository layer keeps the
 storage boundary explicit so a vector database or Postgres can be added later.
@@ -294,8 +320,8 @@ When you run `deno task spans:build --episode <episode-id>`, the application:
 The default max gap is `15s`; override it with `--max-gap-seconds <number>`. The
 default max span duration is `180s`; override it with
 `--max-span-seconds <number>`. Use `--force` when you want to delete and replace
-existing spans for that episode. Manual movie labels are not implemented yet, so
-there is nothing to preserve in this first Phase 2 slice.
+existing spans for that episode. If you already have manual labels for those
+spans, rebuild carefully because replacing span IDs can orphan the review work.
 
 ## Movie Catalog Flow
 
@@ -325,8 +351,27 @@ and training data collection are added.
 
 Use `--force` when resolver heuristics change and you want to delete stale
 candidates for the current resolver version before writing fresh results. Manual
-labels are stored separately in the next milestone, so this command only manages
-candidate rows.
+labels are stored separately, so this command only manages candidate rows.
+
+## Manual Label Flow
+
+When you run `deno task spans:candidates --span <span-id>`, the application:
+
+1. loads ranked candidates for the span
+2. prints confidence and resolver version
+3. prints evidence fields such as search query, title similarity, and overview
+   overlap
+4. prints the current confirmed label if one exists
+
+When you run `deno task spans:label --span <span-id> --candidate-rank <rank>`,
+the application:
+
+1. looks up the candidate for the current resolver version and rank
+2. writes a `span_movie_labels` row with `labelSource = "manual"`
+3. upserts by span ID so rerunning the command keeps one primary label per span
+
+Resolver reruns preserve manual labels because candidate rows and label rows are
+separate tables.
 
 ## Architecture
 
@@ -441,6 +486,7 @@ The test suite currently covers:
 - deterministic discussion span generation and repository reruns
 - TMDb movie search mapping and movie catalog cache upserts
 - span movie candidate ranking and resolution run persistence
+- manual span label confirmation and rerun preservation
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -453,13 +499,12 @@ The test suite currently covers:
   boundaries.
 - Span resolution is heuristic and title-phrase driven; it is expected to need
   human review before labels are accepted.
-- Manual movie labels are not implemented yet.
+- Manual movie labels currently support one primary movie per span.
 - Query scoring is currently in-process over all embeddings, which is fine for
   small corpora but not intended as the final scaling strategy.
 
 ## Suggested Next Steps
 
-- add manual span label confirmation
 - add episode-level resolution reports
 - move search candidates to a more scalable vector-aware backend when needed
 
