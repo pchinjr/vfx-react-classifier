@@ -16,6 +16,11 @@ export type SpanMovieCandidateEvidence = {
   titleSimilarity: number
   overviewOverlap: number
   releaseYearMentioned?: number
+  resolverVersion?: string
+  querySource?: string
+  normalizedPhrase?: string
+  lookupQuery?: string
+  filterPassed?: boolean
 }
 
 export type SpanMovieCandidate = {

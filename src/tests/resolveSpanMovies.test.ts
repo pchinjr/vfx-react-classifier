@@ -100,13 +100,18 @@ Deno.test('resolveSpanMovieCandidates ranks candidates with evidence JSON', asyn
   ])
   assertEquals(result.candidates[0]?.movieId, 'movie_jurassic')
   assertEquals(result.candidates[0]?.rank, 1)
-  assertEquals(result.candidates[0]?.resolverVersion, 'span-movie-resolver-v1')
+  assertEquals(result.candidates[0]?.resolverVersion, 'span-movie-resolver-v2')
   assertEquals(JSON.parse(result.candidates[0]?.evidenceJson ?? '{}'), {
     searchQuery: 'Jurassic Park',
     matchedTitle: 'Jurassic Park',
     titleSimilarity: 1,
     overviewOverlap: 0.1667,
     releaseYearMentioned: 1993,
+    resolverVersion: 'span-movie-resolver-v2',
+    querySource: 'precision',
+    normalizedPhrase: 'jurassic park',
+    lookupQuery: 'Jurassic Park',
+    filterPassed: true,
   })
 })
 

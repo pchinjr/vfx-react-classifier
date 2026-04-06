@@ -120,6 +120,9 @@ try {
         titleSimilarity?: number
         overviewOverlap?: number
         releaseYearMentioned?: number
+        querySource?: string
+        normalizedPhrase?: string
+        lookupQuery?: string
         model?: { name?: string; version?: string; score?: number }
       }
       console.log(
@@ -129,6 +132,13 @@ try {
       )
       if (evidence.releaseYearMentioned) {
         console.log(`releaseYearMentioned: ${evidence.releaseYearMentioned}`)
+      }
+      if (evidence.querySource) {
+        console.log(
+          `querySource: ${evidence.querySource}, normalizedPhrase=${
+            evidence.normalizedPhrase ?? ''
+          }, lookupQuery="${evidence.lookupQuery ?? ''}"`,
+        )
       }
       if (evidence.model) {
         console.log(

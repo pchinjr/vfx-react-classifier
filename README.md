@@ -104,9 +104,9 @@ evaluation metrics comparing model ranking to the heuristic baseline.
 
 Challenge: model inference should not replace candidate generation. If the
 heuristic resolver produces no candidates, the model has nothing to rerank.
-Episode 1 still fails this way because the transcript is lowercase and
-repetitive, even though it contains obvious mentions like `game of thrones`,
-`dragon heart`, `sonic`, and `davey jones`.
+Episode 1 failed this way because the transcript is lowercase and repetitive,
+even though it contains obvious mentions like `game of thrones`, `dragon heart`,
+`sonic`, and `davey jones`.
 
 Solution: make the reranker additive and optional. The resolver still generates
 TMDb candidates first, then `--model <path>` reranks those candidates under a
@@ -119,6 +119,32 @@ Solution: model-ranked outputs are stored under resolver versions such as
 `span-movie-resolver-v1+candidate-reranker@<version>`. Reports scope to the
 latest resolver version, dataset export defaults to the base heuristic resolver,
 and labeling commands accept `--resolver-version` for deliberate review.
+
+### Phase 4: Robust Candidate Generation
+
+Refactored candidate query generation into explicit stages: precision
+extraction, lowercase fallback extraction, alias expansion, query filtering, and
+final resolver query orchestration. The resolver version advanced to
+`span-movie-resolver-v2`.
+
+Challenge: loosening query extraction globally creates junk TMDb lookups. A
+first repeated-phrase fallback recovered episode 1 candidates, but it also
+produced false positives such as `How Much` and `The Sack`.
+
+Solution: keep the fallback constrained to explicit media alias hints for now.
+The seed hints cover known episode 1 failures: `game of thrones`,
+`dragon heart`, `sonic`, `davey jones`, and `pirates of the caribbean`.
+Filtering still blocks generic phrases such as `welcome`, `camera`,
+`united states`, `guys`, and `visual effects`.
+
+Challenge: TMDb movie search is not the same as general media search.
+`Game of Thrones` is a TV reference, so the movie-only lookup can return weak
+movie-adjacent records rather than the canonical TV series.
+
+Solution: preserve evidence fields including `querySource`, `normalizedPhrase`,
+and `lookupQuery`, so weak alias outcomes are visible in review. The next
+catalog expansion should add TV search or media-type-aware lookup rather than
+forcing TV references through movie search.
 
 ## Requirements
 
@@ -720,6 +746,8 @@ The test suite currently covers:
 - Phase 3 baseline reranker training and metric calculation
 - Phase 3 model scoring, reranking, and heuristic fallback behavior
 - Phase 3 evaluation filtering and baseline metric comparison
+- Phase 4 query extraction stages, alias fallback, filtering, and episode 1
+  regressions
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -739,6 +767,10 @@ The test suite currently covers:
 - Model-ranked candidates are stored under model-specific resolver versions, so
   manual labeling commands need `--resolver-version` when confirming from a
   non-default candidate set.
+- Lowercase fallback currently uses a small explicit alias set rather than broad
+  fuzzy phrase extraction.
+- TMDb lookup currently uses movie search only, so TV references such as
+  `Game of Thrones` can produce weak movie-adjacent candidates.
 - Query scoring is currently in-process over all embeddings, which is fine for
   small corpora but not intended as the final scaling strategy.
 
@@ -746,6 +778,7 @@ The test suite currently covers:
 
 - add richer candidate resolution heuristics for person names and one-word
   titles
+- add media-type-aware TMDb lookup for TV references such as `Game of Thrones`
 - add more manual labels and known-failure fixtures for episode 1 and episode 10
 - move search candidates to a more scalable vector-aware backend when needed
 

@@ -6,8 +6,11 @@ import type {
 } from '../../domain/spanResolution.ts'
 import { makeId } from '../../lib/ids.ts'
 import { nowIso } from '../../lib/time.ts'
+import { buildResolverQueries } from '../resolver/buildResolverQueries.ts'
+import type { ResolverQuery } from '../resolver/queryTypes.ts'
+import { normalizeResolverText } from '../resolver/text.ts'
 
-export const SPAN_MOVIE_RESOLVER_VERSION = 'span-movie-resolver-v1'
+export const SPAN_MOVIE_RESOLVER_VERSION = 'span-movie-resolver-v2'
 const MIN_TITLE_SIMILARITY = 0.6
 
 export type MovieSearchFn = (
@@ -29,70 +32,12 @@ type ScoredCandidate = {
   evidence: SpanMovieCandidateEvidence
 }
 
-const STOP_WORDS = new Set([
-  'a',
-  'an',
-  'and',
-  'alright',
-  'are',
-  'boom',
-  'but',
-  'camera',
-  'even',
-  'for',
-  'from',
-  'hey',
-  'honestly',
-  'i',
-  'if',
-  'into',
-  "it's",
-  'its',
-  'just',
-  'like',
-  'maybe',
-  'mine',
-  'no',
-  'oh',
-  'so',
-  'that',
-  "that's",
-  'the',
-  'there',
-  'they',
-  'this',
-  'wait',
-  'watch',
-  'we',
-  'welcome',
-  'what',
-  'when',
-  'where',
-  'with',
-  'yeah',
-  'yes',
-  'you',
-])
-
-const NON_MOVIE_PHRASES = new Set([
-  'internet alright',
-  'oval office',
-  'united states',
-  'video copilot',
-])
-
 function normalize(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  return normalizeResolverText(value)
 }
 
 function tokenSet(value: string) {
   return new Set(normalize(value).split(/\s+/).filter(Boolean))
-}
-
-function isStopWord(value: string) {
-  return STOP_WORDS.has(
-    value.toLowerCase().replace(/[^a-z0-9']+/g, ' ').trim(),
-  )
 }
 
 function overlapScore(left: string, right: string) {
@@ -132,19 +77,26 @@ function mentionedReleaseYear(spanText: string, movie: MovieCatalogRecord) {
 
 function confidenceFor(
   span: DiscussionSpan,
-  query: string,
+  query: ResolverQuery,
   movie: MovieCatalogRecord,
+  resolverVersion: string,
 ): ScoredCandidate {
-  const titleScore = titleSimilarity(query, movie)
+  const titleScore = titleSimilarity(query.query, movie)
   const overviewScore = movie.overview
     ? overlapScore(span.text, movie.overview)
     : 0
   const releaseYearMentioned = mentionedReleaseYear(span.text, movie)
   const releaseYearBoost = releaseYearMentioned ? 0.15 : 0
+  const fallbackBoost = query.source === 'fallback_alias'
+    ? query.confidenceHint ?? 0
+    : 0
   const confidence = Math.min(
     1,
     Number(
-      (titleScore * 0.7 + overviewScore * 0.15 + releaseYearBoost).toFixed(4),
+      (
+        titleScore * 0.7 + overviewScore * 0.15 + releaseYearBoost +
+        fallbackBoost * 0.05
+      ).toFixed(4),
     ),
   )
 
@@ -152,60 +104,27 @@ function confidenceFor(
     movie,
     confidence,
     evidence: {
-      searchQuery: query,
+      searchQuery: query.query,
       matchedTitle: movie.title,
       titleSimilarity: Number(titleScore.toFixed(4)),
       overviewOverlap: Number(overviewScore.toFixed(4)),
       releaseYearMentioned,
+      resolverVersion,
+      querySource: query.source,
+      normalizedPhrase: query.normalizedPhrase,
+      lookupQuery: query.query,
+      filterPassed: true,
     },
   }
 }
 
 export function extractMovieSearchQueries(text: string, maxQueries = 3) {
-  const matches = text.matchAll(
-    /\b(?:[A-Z][A-Za-z0-9'&:-]*|[0-9]+)(?:\s+(?:[A-Z][A-Za-z0-9'&:-]*|[0-9]+)){0,2}/g,
-  )
-  const queries: string[] = []
-
-  for (const match of matches) {
-    const words = match[0].trim().split(/\s+/)
-    while (words.length && isStopWord(words[0])) {
-      words.shift()
-    }
-    while (words.length && isStopWord(words.at(-1) ?? '')) {
-      words.pop()
-    }
-
-    const query = words.join(' ').trim()
-    const normalizedQuery = normalize(query)
-    // Single capitalized words in transcripts are often sentence starts or
-    // filler ("Welcome", "Even", "Camera"). Requiring two meaningful tokens is
-    // a precision-first tradeoff for this MVP; one-word titles can be added as
-    // an explicit alias pass later.
-    if (
-      query.length < 4 ||
-      NON_MOVIE_PHRASES.has(normalizedQuery) ||
-      words.length < 2 ||
-      words.every((word) => isStopWord(word))
-    ) {
-      continue
-    }
-
-    if (!queries.includes(query)) {
-      queries.push(query)
-    }
-
-    if (queries.length >= maxQueries) {
-      break
-    }
-  }
-
-  return queries
+  return buildResolverQueries(text, { maxQueries }).map((query) => query.query)
 }
 
 export function isResolvableSpan(span: DiscussionSpan, minTextLength = 80) {
   return span.text.length >= minTextLength &&
-    extractMovieSearchQueries(span.text, 1).length > 0
+    buildResolverQueries(span.text, { maxQueries: 1 }).length > 0
 }
 
 export async function resolveSpanMovieCandidates(
@@ -221,12 +140,14 @@ export async function resolveSpanMovieCandidates(
   }
 
   const scoredByMovieId = new Map<string, ScoredCandidate>()
-  const queries = extractMovieSearchQueries(span.text, options.maxQueries ?? 3)
+  const queries = buildResolverQueries(span.text, {
+    maxQueries: options.maxQueries ?? 3,
+  })
 
   for (const query of queries) {
-    const movies = await options.searchMovies(query)
+    const movies = await options.searchMovies(query.query)
     for (const movie of movies) {
-      const scored = confidenceFor(span, query, movie)
+      const scored = confidenceFor(span, query, movie, resolverVersion)
       const existing = scoredByMovieId.get(movie.id)
       if (!existing || scored.confidence > existing.confidence) {
         scoredByMovieId.set(movie.id, scored)
