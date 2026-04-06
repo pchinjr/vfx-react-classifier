@@ -108,3 +108,29 @@ Deno.test('trainLogisticReranker rejects empty training rows', () => {
     assertEquals(error.message, 'Cannot train reranker without training rows')
   }
 })
+
+Deno.test('scoreWithLogisticReranker rejects feature schema mismatch', () => {
+  const rows = [
+    row('movie_positive', 1, { exactTitleInSpan: 1 }),
+    row('movie_negative', 0, { exactTitleInSpan: 0 }),
+  ]
+  const model = trainLogisticReranker(rows, {
+    now: '2026-01-01T00:00:00.000Z',
+    version: 'test',
+  })
+  const modelWithOldSchema = {
+    ...model,
+    featureSchemaVersion: 'candidate-features-v0',
+  }
+
+  try {
+    scoreWithLogisticReranker(modelWithOldSchema, parseFeatureVector(rows[0]))
+    assert(false)
+  } catch (error) {
+    assert(error instanceof Error)
+    assertEquals(
+      error.message,
+      'Feature schema mismatch: model=candidate-features-v0, vector=candidate-features-v1',
+    )
+  }
+})

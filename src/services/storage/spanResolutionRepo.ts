@@ -220,15 +220,20 @@ export function getSpanMovieLabel(db: DatabaseClient, spanId: string) {
 export function countSpanMovieCandidatesForEpisode(
   db: DatabaseClient,
   episodeId: string,
+  resolverVersion?: string,
 ) {
+  const resolverFilter = resolverVersion ? 'AND smc.resolver_version = ?' : ''
+  const params = resolverVersion ? [episodeId, resolverVersion] : [episodeId]
+
   return db.queryEntries<{ count: number }>(
     `
     SELECT COUNT(*) AS count
     FROM span_movie_candidates smc
     INNER JOIN discussion_spans ds ON ds.id = smc.span_id
     WHERE ds.episode_id = ?
+      ${resolverFilter}
     `,
-    [episodeId],
+    params,
   )[0]?.count ?? 0
 }
 
@@ -273,7 +278,18 @@ export function getLatestSpanResolutionRunForEpisode(
 export function getEpisodeSpanResolutionRows(
   db: DatabaseClient,
   episodeId: string,
+  resolverVersion?: string,
 ) {
+  const candidateJoinFilter = resolverVersion
+    ? 'AND smc.resolver_version = ?'
+    : ''
+  const topCandidateJoinFilter = resolverVersion
+    ? 'AND top_candidate.resolver_version = ?'
+    : ''
+  const params = resolverVersion
+    ? [resolverVersion, resolverVersion, episodeId]
+    : [episodeId]
+
   return db.queryEntries<{
     spanId: string
     start: number
@@ -297,9 +313,11 @@ export function getEpisodeSpanResolutionRows(
       top_movie.title AS topCandidateTitle,
       top_candidate.confidence AS topCandidateConfidence
     FROM discussion_spans ds
-    LEFT JOIN span_movie_candidates smc ON smc.span_id = ds.id
+    LEFT JOIN span_movie_candidates smc ON
+      smc.span_id = ds.id ${candidateJoinFilter}
     LEFT JOIN span_movie_candidates top_candidate ON
       top_candidate.span_id = ds.id AND top_candidate.rank = 1
+      ${topCandidateJoinFilter}
     LEFT JOIN movie_catalog top_movie ON top_movie.id = top_candidate.movie_id
     LEFT JOIN span_movie_labels sml ON sml.span_id = ds.id
     LEFT JOIN movie_catalog label_movie ON label_movie.id = sml.movie_id
@@ -315,6 +333,6 @@ export function getEpisodeSpanResolutionRows(
       top_candidate.confidence
     ORDER BY ds.start ASC
     `,
-    [episodeId],
+    params,
   )
 }

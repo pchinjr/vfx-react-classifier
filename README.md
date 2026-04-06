@@ -118,6 +118,7 @@ deno task episode:report --episode ep_123
 deno task ml:build-dataset --out artifacts/ml/candidate-training.jsonl
 deno task ml:features --span span_123
 deno task ml:train --dataset artifacts/ml/candidate-training.jsonl --out artifacts/ml/reranker-baseline.json
+deno task ml:score-span --span span_123 --model artifacts/ml/reranker-baseline.json
 deno task query "Jurassic Park T-Rex"
 deno task reembed
 deno task db:init
@@ -178,6 +179,8 @@ deno task fmt
 - records confidence and evidence JSON for each candidate
 - accepts `--force` to replace existing candidates for the current resolver
   version before rerunning
+- accepts `--model <path>` to rerank generated candidates with a trained
+  logistic reranker artifact
 
 `deno task spans:candidates --span <span-id>`
 
@@ -185,12 +188,17 @@ deno task fmt
 - includes confidence, resolver version, and evidence JSON highlights
 - accepts `--refresh` to rerun candidate resolution for that span before
   printing
+- accepts `--model <path>` when refreshing or inspecting model-ranked candidates
+- accepts `--resolver-version <version>` when inspecting a specific persisted
+  resolver output
 
 `deno task spans:label --span <span-id> --candidate-rank <rank>`
 
 - confirms one ranked candidate as the current manual label for a span
 - stores the label in `span_movie_labels`
 - upserts by span ID so changing a manual label is deliberate and idempotent
+- accepts `--resolver-version <version>` to label from a non-default candidate
+  set
 
 `deno task episode:report --episode <episode-id>`
 
@@ -220,6 +228,13 @@ deno task fmt
 - reports top-1 accuracy, top-3 recall, MRR, and heuristic baseline metrics
 - accepts `--dataset <path>`, `--out <path>`, `--iterations <number>`, and
   `--learning-rate <number>`
+
+`deno task ml:score-span --span <span-id>`
+
+- loads an existing model artifact
+- computes model scores for already stored span candidates
+- prints model-ranked candidates without writing to the database
+- accepts `--model <path>`, defaulting to `artifacts/ml/reranker-baseline.json`
 
 `deno task query <text>`
 
@@ -471,6 +486,21 @@ training/evaluation plumbing before any heavier ML dependency is introduced.
 With the current local data volume, metrics mostly prove the command path and
 artifact format rather than real model quality.
 
+## ML Inference Flow
+
+When you run `deno task resolve:episode --episode <episode-id> --model <path>`,
+the application:
+
+1. generates TMDb candidates with the existing rule-based resolver
+2. builds Phase 3 feature vectors for the candidate set
+3. scores each candidate with the trained logistic reranker
+4. reranks candidates by model score
+5. stores model-ranked candidates under a model-specific resolver version
+
+The resolver version is derived from the base resolver and model metadata, such
+as `span-movie-resolver-v1+candidate-reranker@<version>`. If `--model` is not
+provided, the existing heuristic ranking path is used unchanged.
+
 ## Architecture
 
 ```text
@@ -589,6 +619,7 @@ The test suite currently covers:
 - Phase 3 candidate training dataset export
 - Phase 3 candidate feature vector generation
 - Phase 3 baseline reranker training and metric calculation
+- Phase 3 model scoring, reranking, and heuristic fallback behavior
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -605,6 +636,9 @@ The test suite currently covers:
 - Phase 3 training data only includes spans with manual labels.
 - The baseline reranker is only as useful as the available manual labels; with a
   tiny dataset, trainer metrics are not a trustworthy quality signal yet.
+- Model-ranked candidates are stored under model-specific resolver versions, so
+  manual labeling commands need `--resolver-version` when confirming from a
+  non-default candidate set.
 - Query scoring is currently in-process over all embeddings, which is fine for
   small corpora but not intended as the final scaling strategy.
 
@@ -612,7 +646,7 @@ The test suite currently covers:
 
 - add richer candidate resolution heuristics for person names and one-word
   titles
-- integrate the trained reranker into candidate resolution behind a fallback
+- add evaluation and regression reporting for known resolver failures
 - move search candidates to a more scalable vector-aware backend when needed
 
 ## Notes

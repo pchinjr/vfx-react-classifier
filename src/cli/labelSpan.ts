@@ -11,6 +11,8 @@ import { handleCliError, parseNumberFlag, parseStringFlag } from './shared.ts'
 const args = [...Deno.args]
 const spanId = parseStringFlag(args, '--span')
 const candidateRank = parseNumberFlag(args, '--candidate-rank')
+const resolverVersion = parseStringFlag(args, '--resolver-version') ??
+  SPAN_MOVIE_RESOLVER_VERSION
 const db = openDatabase()
 
 try {
@@ -26,7 +28,7 @@ try {
     db,
     spanId,
     candidateRank,
-    SPAN_MOVIE_RESOLVER_VERSION,
+    resolverVersion,
   )
   if (!candidate) {
     throw new Error(
@@ -48,6 +50,7 @@ try {
   console.log(`Label: ${candidate.movieTitle}`)
   console.log(`Source: manual`)
   console.log(`Confidence: ${candidate.confidence.toFixed(4)}`)
+  console.log(`Resolver: ${resolverVersion}`)
 } catch (error) {
   handleCliError(error)
 } finally {

@@ -206,6 +206,37 @@ Deno.test('getEpisodeSpanResolutionRows returns report rows', () => {
   }
 })
 
+Deno.test('episode report candidate queries can be scoped to resolver version', () => {
+  const { db } = createTestDatabase('span-resolution-report-resolver-filter')
+
+  try {
+    seed(db)
+    upsertSpanMovieCandidates(db, [
+      candidate({ resolverVersion: 'span-movie-resolver-v1' }),
+      candidate({
+        id: 'cand_model',
+        resolverVersion: 'span-movie-resolver-v1+candidate-reranker@test',
+        confidence: 0.95,
+      }),
+    ])
+
+    const resolverVersion = 'span-movie-resolver-v1+candidate-reranker@test'
+    const rows = getEpisodeSpanResolutionRows(db, 'ep_one', resolverVersion)
+
+    assertEquals(countSpanMovieCandidatesForEpisode(db, 'ep_one'), 2)
+    assertEquals(
+      countSpanMovieCandidatesForEpisode(db, 'ep_one', resolverVersion),
+      1,
+    )
+    assertEquals(rows.length, 1)
+    assertEquals(rows[0]?.spanId, 'span_one')
+    assertEquals(rows[0]?.candidateCount, 1)
+    assertEquals(rows[0]?.topCandidateConfidence, 0.95)
+  } finally {
+    db.close()
+  }
+})
+
 Deno.test('deleteSpanMovieCandidatesForEpisode clears one resolver version', () => {
   const { db } = createTestDatabase('span-resolution-delete-candidates')
 

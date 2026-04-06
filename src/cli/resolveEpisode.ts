@@ -2,6 +2,11 @@ import { getEnv } from '../config/env.ts'
 import { makeId } from '../lib/ids.ts'
 import { nowIso } from '../lib/time.ts'
 import {
+  loadLogisticReranker,
+  resolverVersionForModel,
+} from '../services/ml/loadReranker.ts'
+import { scoreCandidateSetWithModel } from '../services/ml/scoreCandidateSet.ts'
+import {
   resolveSpanMovieCandidates,
   SPAN_MOVIE_RESOLVER_VERSION,
 } from '../services/movies/resolveSpanMovies.ts'
@@ -27,6 +32,7 @@ const episodeId = parseStringFlag(args, '--episode')
 const maxCandidates = parseNumberFlag(args, '--max-candidates') ?? 5
 const maxQueries = parseNumberFlag(args, '--max-queries') ?? 3
 const force = parseBooleanFlag(args, '--force')
+const modelPath = parseStringFlag(args, '--model')
 const db = openDatabase()
 
 try {
@@ -38,17 +44,21 @@ try {
     )
   }
 
+  const model = modelPath ? await loadLogisticReranker(modelPath) : null
+  const resolverVersion = model
+    ? resolverVersionForModel(SPAN_MOVIE_RESOLVER_VERSION, model)
+    : SPAN_MOVIE_RESOLVER_VERSION
   const startedAt = nowIso()
   const runId = makeId(
     'run',
     episodeId,
-    SPAN_MOVIE_RESOLVER_VERSION,
+    resolverVersion,
     startedAt,
   )
   createSpanResolutionRun(db, {
     id: runId,
     episodeId,
-    resolverVersion: SPAN_MOVIE_RESOLVER_VERSION,
+    resolverVersion,
     startedAt,
     status: 'running',
   })
@@ -62,12 +72,13 @@ try {
       deleteSpanMovieCandidatesForEpisode(
         db,
         episodeId,
-        SPAN_MOVIE_RESOLVER_VERSION,
+        resolverVersion,
       )
     }
 
     for (const span of spans) {
       const result = await resolveSpanMovieCandidates(span, {
+        resolverVersion,
         maxCandidates,
         maxQueries,
         searchMovies: (query) =>
@@ -76,14 +87,22 @@ try {
             limit: maxCandidates,
           }),
       })
+      const candidates = model
+        ? scoreCandidateSetWithModel(
+          span,
+          result.candidates,
+          result.movies,
+          model,
+        )
+        : result.candidates
 
-      if (result.candidates.length) {
+      if (candidates.length) {
         resolvedSpanCount += 1
-        candidateCount += result.candidates.length
+        candidateCount += candidates.length
       }
 
       upsertMovieCatalogRecords(db, result.movies)
-      upsertSpanMovieCandidates(db, result.candidates)
+      upsertSpanMovieCandidates(db, candidates)
     }
 
     completeSpanResolutionRun(
@@ -106,7 +125,10 @@ try {
 
   console.log(`Episode: ${episodeId}`)
   console.log(`Run: ${runId}`)
-  console.log(`Resolver: ${SPAN_MOVIE_RESOLVER_VERSION}`)
+  console.log(`Resolver: ${resolverVersion}`)
+  if (modelPath) {
+    console.log(`Model: ${modelPath}`)
+  }
   console.log(`Spans: ${spans.length}`)
   console.log(`Mode: ${force ? 'replace' : 'upsert'}`)
   console.log(`Resolved spans: ${resolvedSpanCount}`)

@@ -26,11 +26,20 @@ try {
     throw new Error(`Episode not found: ${episodeId}`)
   }
 
-  const spanCount = countDiscussionSpansForEpisode(db, episodeId)
-  const candidateCount = countSpanMovieCandidatesForEpisode(db, episodeId)
-  const labelCount = countSpanMovieLabelsForEpisode(db, episodeId)
   const latestRun = getLatestSpanResolutionRunForEpisode(db, episodeId)
-  const rows = getEpisodeSpanResolutionRows(db, episodeId)
+  const reportResolverVersion = latestRun?.resolverVersion
+  const spanCount = countDiscussionSpansForEpisode(db, episodeId)
+  const candidateCount = countSpanMovieCandidatesForEpisode(
+    db,
+    episodeId,
+    reportResolverVersion,
+  )
+  const labelCount = countSpanMovieLabelsForEpisode(db, episodeId)
+  const rows = getEpisodeSpanResolutionRows(
+    db,
+    episodeId,
+    reportResolverVersion,
+  )
   const spansWithCandidates = rows.filter((row) => row.candidateCount > 0)
     .length
   const unresolvedCount = spanCount - labelCount

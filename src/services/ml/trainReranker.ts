@@ -241,8 +241,18 @@ export function scoreWithLogisticReranker(
   model: LogisticRerankerModel,
   vector: CandidateFeatureVector,
 ) {
-  const features = featureVectorToArray(vector).map((value, index) =>
-    (value - model.means[index]) / model.scales[index]
+  if (vector.schemaVersion !== model.featureSchemaVersion) {
+    throw new Error(
+      `Feature schema mismatch: model=${model.featureSchemaVersion}, vector=${vector.schemaVersion}`,
+    )
+  }
+
+  if (vector.featureOrder.join('|') !== model.featureOrder.join('|')) {
+    throw new Error('Feature order mismatch between model and vector')
+  }
+
+  const features = model.featureOrder.map((feature, index) =>
+    (vector.values[feature] - model.means[index]) / model.scales[index]
   )
   return sigmoid(dot(model.weights, features) + model.bias)
 }

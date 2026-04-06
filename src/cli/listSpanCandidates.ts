@@ -1,5 +1,10 @@
 import { getEnv } from '../config/env.ts'
 import {
+  loadLogisticReranker,
+  resolverVersionForModel,
+} from '../services/ml/loadReranker.ts'
+import { scoreCandidateSetWithModel } from '../services/ml/scoreCandidateSet.ts'
+import {
   resolveSpanMovieCandidates,
   SPAN_MOVIE_RESOLVER_VERSION,
 } from '../services/movies/resolveSpanMovies.ts'
@@ -16,6 +21,8 @@ import { handleCliError, parseBooleanFlag, parseStringFlag } from './shared.ts'
 const args = [...Deno.args]
 const spanId = parseStringFlag(args, '--span')
 const refresh = parseBooleanFlag(args, '--refresh')
+const modelPath = parseStringFlag(args, '--model')
+const resolverVersionFlag = parseStringFlag(args, '--resolver-version')
 const db = openDatabase()
 
 try {
@@ -26,6 +33,12 @@ try {
       'Usage: deno task spans:candidates --span <span-id> [--refresh]',
     )
   }
+
+  const model = modelPath ? await loadLogisticReranker(modelPath) : null
+  const resolverVersion = resolverVersionFlag ??
+    (model
+      ? resolverVersionForModel(SPAN_MOVIE_RESOLVER_VERSION, model)
+      : SPAN_MOVIE_RESOLVER_VERSION)
 
   if (refresh) {
     const span = db.queryEntries<{
@@ -58,13 +71,22 @@ try {
     }
 
     const result = await resolveSpanMovieCandidates(span, {
+      resolverVersion,
       searchMovies: (query) =>
         searchTmdbMovies(query, {
           apiKey: getEnv().tmdbApiKey,
         }),
     })
+    const candidates = model
+      ? scoreCandidateSetWithModel(
+        span,
+        result.candidates,
+        result.movies,
+        model,
+      )
+      : result.candidates
     upsertMovieCatalogRecords(db, result.movies)
-    upsertSpanMovieCandidates(db, result.candidates)
+    upsertSpanMovieCandidates(db, candidates)
   }
 
   const label = getSpanMovieLabel(db, spanId)
@@ -80,7 +102,7 @@ try {
   const candidates = getSpanMovieCandidates(
     db,
     spanId,
-    SPAN_MOVIE_RESOLVER_VERSION,
+    resolverVersion,
   )
   if (!candidates.length) {
     console.log('No candidates found.')
@@ -98,6 +120,7 @@ try {
         titleSimilarity?: number
         overviewOverlap?: number
         releaseYearMentioned?: number
+        model?: { name?: string; version?: string; score?: number }
       }
       console.log(
         `evidence: query="${evidence.searchQuery ?? ''}", titleSimilarity=${
@@ -106,6 +129,13 @@ try {
       )
       if (evidence.releaseYearMentioned) {
         console.log(`releaseYearMentioned: ${evidence.releaseYearMentioned}`)
+      }
+      if (evidence.model) {
+        console.log(
+          `model: ${evidence.model.name ?? 'unknown'}@${
+            evidence.model.version ?? 'unknown'
+          }, score=${evidence.model.score ?? 0}`,
+        )
       }
       console.log(`created: ${candidate.createdAt}`)
       console.log('')
