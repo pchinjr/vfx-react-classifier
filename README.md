@@ -119,6 +119,7 @@ deno task ml:build-dataset --out artifacts/ml/candidate-training.jsonl
 deno task ml:features --span span_123
 deno task ml:train --dataset artifacts/ml/candidate-training.jsonl --out artifacts/ml/reranker-baseline.json
 deno task ml:score-span --span span_123 --model artifacts/ml/reranker-baseline.json
+deno task ml:evaluate --dataset artifacts/ml/candidate-training.jsonl --model artifacts/ml/reranker-baseline.json
 deno task query "Jurassic Park T-Rex"
 deno task reembed
 deno task db:init
@@ -213,6 +214,8 @@ deno task fmt
 - assigns negative rows for the other candidates attached to the same span
 - includes deterministic `train`, `validation`, or `test` splits by span ID
 - accepts `--out <path>`, defaulting to `artifacts/ml/candidate-training.jsonl`
+- accepts `--resolver-version <version>`, defaulting to the base heuristic
+  resolver so model-ranked candidates are not exported by accident
 
 `deno task ml:features --span <span-id>`
 
@@ -235,6 +238,14 @@ deno task fmt
 - computes model scores for already stored span candidates
 - prints model-ranked candidates without writing to the database
 - accepts `--model <path>`, defaulting to `artifacts/ml/reranker-baseline.json`
+
+`deno task ml:evaluate`
+
+- evaluates exported candidate training rows without mutating the database
+- compares model ranking metrics against heuristic baseline rank metrics
+- reports accuracy, top-1 accuracy, top-3 recall, and MRR
+- accepts `--dataset <path>`, `--model <path>`,
+  `--split <all|train|validation|test>`, and `--resolver-version <version>`
 
 `deno task query <text>`
 
@@ -454,8 +465,9 @@ When you run `deno task ml:build-dataset`, the application:
 4. marks the other candidates for that span as `label = 0`
 5. writes deterministic JSONL rows to the output path
 
-This is the first Phase 3 primitive. It prepares labeled data for a future
-candidate reranker.
+This is the first Phase 3 primitive. It prepares labeled data for a candidate
+reranker. By default, export is scoped to the base heuristic resolver version so
+model-ranked candidates do not become circular training data.
 
 ## ML Feature Flow
 
@@ -500,6 +512,20 @@ the application:
 The resolver version is derived from the base resolver and model metadata, such
 as `span-movie-resolver-v1+candidate-reranker@<version>`. If `--model` is not
 provided, the existing heuristic ranking path is used unchanged.
+
+## ML Evaluation Flow
+
+When you run `deno task ml:evaluate`, the application:
+
+1. reads exported candidate rows from JSONL
+2. filters by resolver version and split
+3. optionally loads a trained reranker artifact
+4. scores each candidate row with the model or heuristic confidence
+5. compares top-1, top-3, and MRR against the heuristic rank baseline
+
+This is the Phase 3 regression harness entrypoint. With the current tiny labeled
+dataset, it mainly validates the evaluation path; it becomes more meaningful as
+more manual labels are added.
 
 ## Architecture
 
@@ -620,6 +646,7 @@ The test suite currently covers:
 - Phase 3 candidate feature vector generation
 - Phase 3 baseline reranker training and metric calculation
 - Phase 3 model scoring, reranking, and heuristic fallback behavior
+- Phase 3 evaluation filtering and baseline metric comparison
 - boundedness protections for invalid segmentation config
 - timeout protections for stalled subprocess and embedding calls
 
@@ -646,7 +673,7 @@ The test suite currently covers:
 
 - add richer candidate resolution heuristics for person names and one-word
   titles
-- add evaluation and regression reporting for known resolver failures
+- add more manual labels and known-failure fixtures for episode 1 and episode 10
 - move search candidates to a more scalable vector-aware backend when needed
 
 ## Notes

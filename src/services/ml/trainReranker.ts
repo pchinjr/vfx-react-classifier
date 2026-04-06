@@ -2,12 +2,10 @@ import type {
   CandidateFeatureVector,
 } from '../../domain/candidateFeatureVector.ts'
 import type { CandidateTrainingRow } from '../../domain/candidateTrainingRow.ts'
-import type {
-  LogisticRerankerModel,
-  RerankerMetrics,
-} from '../../domain/mlModel.ts'
+import type { LogisticRerankerModel } from '../../domain/mlModel.ts'
 import { makeId } from '../../lib/ids.ts'
 import { nowIso } from '../../lib/time.ts'
+import { evaluateRerankerRows } from './evaluateReranker.ts'
 
 export type TrainRerankerOptions = {
   name?: string
@@ -16,12 +14,6 @@ export type TrainRerankerOptions = {
   learningRate?: number
   l2?: number
   now?: string
-}
-
-type ScoredRow = {
-  row: CandidateTrainingRow
-  score: number
-  baselineScore: number
 }
 
 function sigmoid(value: number) {
@@ -75,94 +67,6 @@ function normalizeMatrix(matrix: number[][]) {
   }
 }
 
-function scoreRows(
-  rows: CandidateTrainingRow[],
-  scores: number[],
-): ScoredRow[] {
-  return rows.map((row, index) => {
-    const values = parseFeatureVector(row).values
-    return {
-      row,
-      score: scores[index],
-      baselineScore: -values.heuristicRank,
-    }
-  })
-}
-
-function metricsFor(scoredRows: ScoredRow[]): RerankerMetrics {
-  if (!scoredRows.length) {
-    return {
-      rows: 0,
-      spans: 0,
-      accuracy: 0,
-      top1Accuracy: 0,
-      top3Recall: 0,
-      mrr: 0,
-      baselineTop1Accuracy: 0,
-      baselineTop3Recall: 0,
-      baselineMrr: 0,
-    }
-  }
-
-  const correct =
-    scoredRows.filter((item) => (item.score >= 0.5 ? 1 : 0) === item.row.label)
-      .length
-  const bySpan = Map.groupBy(scoredRows, (item) => item.row.spanId)
-
-  let top1 = 0
-  let top3 = 0
-  let mrr = 0
-  let baselineTop1 = 0
-  let baselineTop3 = 0
-  let baselineMrr = 0
-
-  for (const candidates of bySpan.values()) {
-    const ranked = [...candidates].sort((left, right) =>
-      right.score - left.score
-    )
-    const baselineRanked = [...candidates].sort((left, right) =>
-      right.baselineScore - left.baselineScore
-    )
-    const positiveIndex = ranked.findIndex((item) => item.row.label === 1)
-    const baselinePositiveIndex = baselineRanked.findIndex((item) =>
-      item.row.label === 1
-    )
-
-    if (positiveIndex === 0) {
-      top1 += 1
-    }
-    if (positiveIndex >= 0 && positiveIndex < 3) {
-      top3 += 1
-    }
-    if (positiveIndex >= 0) {
-      mrr += 1 / (positiveIndex + 1)
-    }
-
-    if (baselinePositiveIndex === 0) {
-      baselineTop1 += 1
-    }
-    if (baselinePositiveIndex >= 0 && baselinePositiveIndex < 3) {
-      baselineTop3 += 1
-    }
-    if (baselinePositiveIndex >= 0) {
-      baselineMrr += 1 / (baselinePositiveIndex + 1)
-    }
-  }
-
-  const spanCount = bySpan.size
-  return {
-    rows: scoredRows.length,
-    spans: spanCount,
-    accuracy: correct / scoredRows.length,
-    top1Accuracy: top1 / spanCount,
-    top3Recall: top3 / spanCount,
-    mrr: mrr / spanCount,
-    baselineTop1Accuracy: baselineTop1 / spanCount,
-    baselineTop3Recall: baselineTop3 / spanCount,
-    baselineMrr: baselineMrr / spanCount,
-  }
-}
-
 export function trainLogisticReranker(
   rows: CandidateTrainingRow[],
   options: TrainRerankerOptions = {},
@@ -213,15 +117,10 @@ export function trainLogisticReranker(
     bias -= learningRate * (biasGradient / rows.length)
   }
 
-  const scores = normalized.map((features) =>
-    sigmoid(dot(weights, features) + bias)
-  )
-  const metrics = metricsFor(scoreRows(rows, scores))
   const createdAt = options.now ?? nowIso()
   const name = options.name ?? 'candidate-reranker'
   const version = options.version ?? createdAt.replace(/[:.]/g, '-')
-
-  return {
+  const model: LogisticRerankerModel = {
     id: makeId('mlmodel', name, version, featureSchemaVersion),
     name,
     version,
@@ -232,8 +131,23 @@ export function trainLogisticReranker(
     bias,
     means,
     scales,
-    metrics,
+    metrics: {
+      rows: 0,
+      spans: 0,
+      accuracy: 0,
+      top1Accuracy: 0,
+      top3Recall: 0,
+      mrr: 0,
+      baselineTop1Accuracy: 0,
+      baselineTop3Recall: 0,
+      baselineMrr: 0,
+    },
     createdAt,
+  }
+
+  return {
+    ...model,
+    metrics: evaluateRerankerRows(rows, model),
   }
 }
 

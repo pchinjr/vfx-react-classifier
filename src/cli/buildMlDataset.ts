@@ -5,17 +5,20 @@ import {
   buildCandidateTrainingRows,
   toJsonl,
 } from '../services/ml/buildTrainingDataset.ts'
+import { SPAN_MOVIE_RESOLVER_VERSION } from '../services/movies/resolveSpanMovies.ts'
 import { handleCliError, parseStringFlag } from './shared.ts'
 
 const args = [...Deno.args]
 const outputPath = parseStringFlag(args, '--out') ??
   'artifacts/ml/candidate-training.jsonl'
+const resolverVersion = parseStringFlag(args, '--resolver-version') ??
+  SPAN_MOVIE_RESOLVER_VERSION
 const db = openDatabase()
 
 try {
   initializeDatabase(db)
 
-  const rows = buildCandidateTrainingRows(db)
+  const rows = buildCandidateTrainingRows(db, { resolverVersion })
   await Deno.mkdir(dirname(outputPath), { recursive: true })
   await Deno.writeTextFile(outputPath, toJsonl(rows))
 
@@ -24,6 +27,7 @@ try {
   const spans = new Set(rows.map((row) => row.spanId)).size
 
   console.log(`Output: ${outputPath}`)
+  console.log(`Resolver: ${resolverVersion}`)
   console.log(`Rows: ${rows.length}`)
   console.log(`Spans: ${spans}`)
   console.log(`Positive rows: ${positives}`)

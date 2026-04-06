@@ -41,7 +41,13 @@ export function splitForSpan(spanId: string): CandidateTrainingSplit {
 
 export function buildCandidateTrainingRows(
   db: DatabaseClient,
+  options: { resolverVersion?: string } = {},
 ): CandidateTrainingRow[] {
+  const resolverFilter = options.resolverVersion
+    ? 'AND smc.resolver_version = ?'
+    : ''
+  const params = options.resolverVersion ? [options.resolverVersion] : []
+
   const rows = db.queryEntries<CandidateTrainingSourceRow>(
     `
     WITH candidate_context AS (
@@ -78,8 +84,10 @@ export function buildCandidateTrainingRows(
     INNER JOIN movie_catalog mc ON mc.id = smc.movie_id
     INNER JOIN candidate_context ON candidate_context.id = smc.id
     WHERE sml.label_source = 'manual'
+      ${resolverFilter}
     ORDER BY ds.episode_id ASC, ds.start ASC, smc.rank ASC
     `,
+    params,
   )
 
   return rows.map((row) => {
